@@ -151,7 +151,7 @@ plotting.clusterProfile <- function(clProf.reshape.df,  type = "dot", by = "perc
             p <- p +
                 geom_point() +
                     aes(color=pvalue) +
-                        scale_colour_gradient(low="red", high="yellow")
+                        scale_colour_gradient(low="red", high="blue")
         } else {
             p <- p + geom_point(colour="steelblue")
         }

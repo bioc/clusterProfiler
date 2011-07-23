@@ -178,7 +178,7 @@ setMethod("plot", signature(x="enrichGOResult"),
               ##color scale based on pvalue
               p <- p +
                   aes(fill=pvalue) +
-                      scale_fill_continuous(low="red", high="yellow")
+                      scale_fill_continuous(low="red", high="blue")
 			  return(p)
           }
           )
