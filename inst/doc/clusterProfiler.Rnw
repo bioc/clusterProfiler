@@ -173,6 +173,7 @@ plot(yy, title="CC Ontology Enrichment Comparison", type="bar", by="count")
 
 <<compareCluster-KEGG, eval=F>>=
 zz <- compareCluster(gcSample, fun=enrichKEGG, organism="human", pvalueCutoff=0.05)
+plot(zz, title="KEGG Pathway Enrichment Comparison")
 @
 
 \begin{figure}
