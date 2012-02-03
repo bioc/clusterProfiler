@@ -1,5 +1,5 @@
 Package: clusterProfiler
-Imports: methods, DBI, plyr, qvalue, AnnotationDbi, GO.db, KEGG.db,
+Imports: methods, DBI, qvalue, AnnotationDbi, GO.db, KEGG.db,
     org.Hs.eg.db, org.Mm.eg.db, org.Sc.sgd.db
 Maintainer: Guangchuang Yu <guangchuangyu@gmail.com>
 License: Artistic-2.0
@@ -12,7 +12,7 @@ Description: The package implements methods to analyze and visualize
 Version: 1.2.0
 biocViews: Bioinformatics, Clustering, GO, Pathways, Visualization,
     MultipleComparisons
-Depends: stats, ggplot2
+Depends: stats, ggplot2, plyr
 Suggests: GOSemSim, DOSE
 Collate: 'AllGenerics.R' 'clusterProfiler-package.R'
     'compareCluster.R' 'enrichGO.R' 'enrichKEGG.R' 'groupGO.R'
