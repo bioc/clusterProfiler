@@ -24,7 +24,8 @@ Suggests:
     GOSemSim,
     ReactomePA
 License: Artistic-2.0
-URL: http://www.ncbi.nlm.nih.gov/pubmed/22455463
+URL:
+    http://www.jclinbioinformatics.com/content/1/1/15
 biocViews: Bioinformatics,
     Clustering,
     GO,
