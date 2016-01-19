@@ -248,7 +248,7 @@ kk2 <- gseKEGG(geneList     = geneList,
                organism     = "human",
                nPerm        = 1000,
                minGSSize    = 120,
-               pvalueCutoff = 0.01,
+               pvalueCutoff = 0.05,
                verbose      = FALSE,
                use_internal_data = TRUE)
 head(summary(kk2))
