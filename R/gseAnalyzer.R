@@ -3,7 +3,7 @@
 ##'
 ##' @title gseGO
 ##' @param geneList order ranked geneList
-##' @param ont one of "BP", "MF", "CC" or "GO"
+##' @param ont one of "BP", "MF", "CC" or "ALL"
 ##' @param OrgDb OrgDb
 ##' @param keyType keytype of gene
 ##' @param exponent weight of each step

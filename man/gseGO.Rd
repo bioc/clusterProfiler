@@ -12,7 +12,7 @@ gseGO(geneList, ont = "BP", OrgDb, keyType = "ENTREZID",
 \arguments{
 \item{geneList}{order ranked geneList}
 
-\item{ont}{one of "BP", "MF", "CC" or "GO"}
+\item{ont}{one of "BP", "MF", "CC" or "ALL"}
 
 \item{OrgDb}{OrgDb}
 
