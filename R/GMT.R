@@ -11,11 +11,20 @@
 ##' @return data.frame
 ##' @author Guangchuang Yu
 read.gmt <- function(gmtfile) {
-    getGmt <- get_fun_from_pkg("GSEABase", "getGmt")
-    geneIds <- get_fun_from_pkg("GSEABase", "geneIds")
+    ## getGmt <- get_fun_from_pkg("GSEABase", "getGmt")
+    ## geneIds <- get_fun_from_pkg("GSEABase", "geneIds")
 
-    gmt <- getGmt(con=gmtfile)
-    ont2gene <- geneIds(gmt) %>% stack
+    ## gmt <- getGmt(con=gmtfile)
+    ## ont2gene <- geneIds(gmt) %>% stack
+    ## ont2gene <- ont2gene[, c("ind", "values")]
+    ## colnames(ont2gene) <- c("ont", "gene")
+
+    x <- readLines(gmtfile)
+    res <- strsplit(x, "\t")
+    names(res) <- vapply(res, function(y) y[1], character(1))
+    res <- lapply(res, "[", -c(1:2))
+
+    ont2gene <- stack(res)
     ont2gene <- ont2gene[, c("ind", "values")]
     colnames(ont2gene) <- c("ont", "gene")
     return(ont2gene)

@@ -130,22 +130,31 @@ get_GO_data <- function(OrgDb, ont, keytype) {
         }
 
         kk <- keys(OrgDb, keytype=keytype)
-        goAnno <- suppressMessages(
-            select(OrgDb, keys=kk, keytype=keytype,
-                   columns=c("GOALL", "ONTOLOGYALL")))
+        ## goAnno <- suppressMessages(
+        ##     select(OrgDb, keys=kk, keytype=keytype,
+        ##            columns=c("GOALL", "ONTOLOGYALL")))
 
-        goAnno <- unique(goAnno[!is.na(goAnno$GOALL), ])
+        ## goAnno <- unique(goAnno[!is.na(goAnno$GOALL), ])
 
+        goterms <- AnnotationDbi::Ontology(GO.db::GOTERM)
+        if (ont != "ALL") {
+            goterms <- goterms[goterms == ont]
+        }
+        go2gene <- suppressMessages(
+            AnnotationDbi::mapIds(OrgDb, keys=names(goterms), column=keytype,
+                                  keytype="GOALL", multiVals='list')
+        )
+        goAnno <- stack(go2gene)
+        colnames(goAnno) <- c(keytype, "GOALL")
+        goAnno <- unique(goAnno[!is.na(goAnno[,1]), ])
+        goAnno$ONTOLOGYALL <- goterms[goAnno$GOALL]
+        
         assign("goAnno", goAnno, envir=GO_Env)
         assign("keytype", keytype, envir=GO_Env)
         assign("organism", get_organism(OrgDb), envir=GO_Env)
     }
 
-    if (ont == "ALL") {
-        GO2GENE <- unique(goAnno[, c(2,1)])
-    } else {
-        GO2GENE <- unique(goAnno[goAnno$ONTOLOGYALL == ont, c(2,1)])
-    }
+    GO2GENE <- unique(goAnno[, c(2,1)])
 
     GO_DATA <- build_Anno(GO2GENE, get_GO2TERM_table())
 
