@@ -4,8 +4,14 @@
 \alias{fortify.compareClusterResult}
 \title{fortify}
 \usage{
-\method{fortify}{compareClusterResult}(model, data, showCategory = 5,
-  by = "geneRatio", split = NULL, includeAll = TRUE)
+\method{fortify}{compareClusterResult}(
+  model,
+  data,
+  showCategory = 5,
+  by = "geneRatio",
+  split = NULL,
+  includeAll = TRUE
+)
 }
 \arguments{
 \item{model}{compareClusterResult object}
