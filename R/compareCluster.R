@@ -110,13 +110,15 @@ compareCluster <- function(geneClusters, fun="enrichGO", data='', ...) {
     return(res)
 }
 
+
 extract_params <- function(x) {
     y <- rlang::quo_text(x)
     if (is.function(x)) y <- sub('\nNULL$', '', y)
 
     y <- gsub('"', '', y) %>%
-        sub(".*\\(", "", .) %>%
-        sub("\\)", "", .) %>%
+        ## sub(".*\\(", "", .) %>%
+        sub("[^\\(]+\\(", "", .) %>% 
+        sub("\\)$", "", .) %>%
         gsub("\\s+", "", .)
 
     y <- strsplit(y, ",")[[1]]
