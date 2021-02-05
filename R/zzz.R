@@ -10,6 +10,8 @@
                        "OMICS: A Journal of Integrative Biology. 2012, 16(5):284-287.")
 
     packageStartupMessage(paste0(msg, citation))
+
+    options(timeout = max(300, getOption("timeout"))) # see ?download.file
 }
 
 
