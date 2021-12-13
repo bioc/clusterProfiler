@@ -149,10 +149,10 @@ extract_params <- function(x) {
 ##' @importFrom utils str
 setMethod("show", signature(object="compareClusterResult"),
           function (object){
-              cmsg <- paste("  Guangchuang Yu, Li-Gen Wang, Yanyan Han and Qing-Yu He.",
-                            "  clusterProfiler: an R package for comparing biological themes among",
-                            "  gene clusters. OMICS: A Journal of Integrative Biology 2012,",
-                            "  16(5):284-287",
+              cmsg <- paste("T Wu, E Hu, S Xu, M Chen, P Guo, Z Dai, T Feng, L Zhou, ",
+                            "W Tang, L Zhan, X Fu, S Liu, X Bo, and G Yu. ", 
+                            "clusterProfiler 4.0: A universal enrichment tool for interpreting omics data. ", 
+                            "The Innovation. 2021, 2(3):100141",
                             sep="\n", collapse="\n")
 
               geneClusterLen <- length(object@geneClusters)
