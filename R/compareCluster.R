@@ -15,6 +15,7 @@
 ##' @importFrom plyr ldply
 ##' @importFrom plyr dlply
 ##' @importFrom utils modifyList
+##' @importFrom rlang '%||%'
 ##' @importClassesFrom DOSE compareClusterResult
 ##' @export
 ##' @author Guangchuang Yu \url{https://guangchuangyu.github.io}
@@ -107,7 +108,7 @@ compareCluster <- function(geneClusters, fun="enrichGO", data='', ...) {
     
     res@keytype <- keytype
     res@readable <- as.logical(readable)
-    res@fun <- params[['fun']]
+    res@fun <- params[['fun']] %||% 'enrichGO'
 
     return(res)
 }
