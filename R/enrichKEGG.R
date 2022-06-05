@@ -4,7 +4,7 @@
 ##'
 ##'
 ##' @param gene a vector of entrez gene id.
-##' @param organism supported organism listed in 'http://www.genome.jp/kegg/catalog/org_list.html'
+##' @param organism supported organism listed in 'https://www.genome.jp/kegg/catalog/org_list.html'
 ##' @param keyType one of "kegg", 'ncbi-geneid', 'ncib-proteinid' and 'uniprot'
 ##' @param minGSSize minimal size of genes annotated by Ontology term for testing.
 ##' @param maxGSSize maximal size of genes annotated for testing
@@ -161,7 +161,7 @@ download.KEGG.Path <- function(species) {
         message <- paste("Failed to download KEGG data.",
                          "Wrong 'species' or the network is unreachable.",
                          "The 'species' should be one of organisms listed in",
-                         "'http://www.genome.jp/kegg/catalog/org_list.html'")
+                         "'https://www.genome.jp/kegg/catalog/org_list.html'")
         stop(message)
     }
 
@@ -188,7 +188,7 @@ download.KEGG.Module <- function(species) {
         message <- paste("Failed to download KEGG data.",
                          "Wrong 'species' or the network is unreachable.",
                          "The 'species' should be one of organisms listed in",
-                         "'http://www.genome.jp/kegg/catalog/org_list.html'")
+                         "'https://www.genome.jp/kegg/catalog/org_list.html'")
         stop(message)
     }
 
