@@ -5,7 +5,7 @@
 ##'
 ##' @param gene a vector of entrez gene id.
 ##' @param organism supported organism listed in 'https://www.genome.jp/kegg/catalog/org_list.html'
-##' @param keyType one of "kegg", 'ncbi-geneid', 'ncib-proteinid' and 'uniprot'
+##' @param keyType one of "kegg", 'ncbi-geneid', 'ncbi-proteinid' and 'uniprot'
 ##' @param minGSSize minimal size of genes annotated by Ontology term for testing.
 ##' @param maxGSSize maximal size of genes annotated for testing
 ##' @inheritParams enricher
@@ -177,6 +177,8 @@ download.KEGG.Path <- function(species) {
     keggpathid2extid.df[,2] %<>% gsub("[^:]+:", "", .)
 
     keggpathid2name.df <- kegg_list("pathway", species)
+
+    keggpathid2name.df[,2] <- sub("\\s-\\s[a-zA-Z ]+\\(\\w+\\)$", "", keggpathid2name.df[,2])
     # keggpathid2name.df[,1] %<>% gsub("path:map", species, .)
 
     ## if 'species="ko"', ko and map path are duplicated, only keep ko path.
@@ -285,7 +287,7 @@ get_data_from_KEGG_db <- function(species) {
     PATHID2EXTID.df <- stack(PATHID2EXTID)
     PATHID2EXTID.df <- PATHID2EXTID.df[, c(2,1)]
     PATHID2NAME <- as.list(get_KEGG_db("KEGGPATHID2NAME"))
-    PATHID2NAME.df <- data.frame(path=paste0(species, names(PATHID2NAME)),
+    PATHID2NAME.df <- data.frame(path=names(PATHID2NAME),
                                  name=unlist(PATHID2NAME))
     build_Anno(PATHID2EXTID.df, PATHID2NAME.df)
 }
