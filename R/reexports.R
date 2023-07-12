@@ -6,6 +6,10 @@ magrittr::`%>%`
 ##' @export
 magrittr::`%<>%`
 
+##' @importFrom GOSemSim read.blast2go
+##' @export
+GOSemSim::read.blast2go
+
 ##' @importFrom gson read.gmt
 ##' @export
 gson::read.gmt
