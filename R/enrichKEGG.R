@@ -36,6 +36,12 @@ enrichKEGG <- function(gene,
                        qvalueCutoff      = 0.2,
                        use_internal_data = FALSE) {
 
+    if (inherits(organism, "character")) {           
+        if (organism == "cpd") {
+            organism = gson_cpd()
+        }
+    }
+
     if (inherits(organism, "character")) {                       
         species <- organismMapper(organism)
         if (use_internal_data) {
@@ -46,6 +52,7 @@ enrichKEGG <- function(gene,
     } else if (inherits(organism, "GSON")) {
         KEGG_DATA <- organism
         species <- KEGG_DATA@species
+        keyType <- KEGG_DATA@keytype
     } else {
         stop("organism should be a species name or a GSON object")
     }

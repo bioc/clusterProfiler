@@ -160,6 +160,11 @@ gseKEGG <- function(geneList,
                     by                = 'fgsea',
                     ...) {
 
+    if (inherits(organism, "character")) {           
+        if (organism == "cpd") {
+            organism = gson_cpd()
+        }
+    }
 
     if (inherits(organism, "character")) {                       
         species <- organismMapper(organism)
@@ -171,6 +176,7 @@ gseKEGG <- function(geneList,
     } else if (inherits(organism, "GSON")) {
         KEGG_DATA <- organism
         species <- KEGG_DATA@species
+        keyType <- KEGG_DATA@keytype
     } else {
         stop("organism should be a species name or a GSON object")
     }
@@ -195,8 +201,9 @@ gseKEGG <- function(geneList,
 
     res@organism <- species
     res@setType <- "KEGG"
-    res@keytype <- "UNKNOWN"
-
+    # res@keytype <- "UNKNOWN"
+    res@keytype <- keyType
+    
     return(res)
 }
 
