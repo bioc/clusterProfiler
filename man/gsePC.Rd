@@ -4,7 +4,7 @@
 \alias{gsePC}
 \title{gsePC}
 \usage{
-gsePC(geneList, source, keyType, ...)
+gsePC(geneList, ...)
 }
 \arguments{
 \item{geneList}{a ranked gene list}

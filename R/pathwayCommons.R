@@ -14,7 +14,7 @@ enrichPC <- function(gene, ...) {
 
     res@ontology <- pcdata@gsname
     res@organism <- pcdata@species
-    res@keytype <-  keyType
+    # res@keytype <-  keyType
 
     return(res)
 }
@@ -28,7 +28,7 @@ enrichPC <- function(gene, ...) {
 ##' @importFrom rlang check_installed
 ##' @return A \code{gseaResult} instance
 ##' @export
-gsePC <- function(geneList, source, keyType, ...) {
+gsePC <- function(geneList, ...) {
     pcdata <- get_pc_data(output = 'gson')
     res <- GSEA(geneList, gson = pcdata, ...)
 
@@ -36,13 +36,13 @@ gsePC <- function(geneList, source, keyType, ...) {
 
     res@ontology <- pcdata@gsname
     res@organism <- pcdata@species
-    res@keytype <-  keyType
+    # res@keytype <-  keyType
 
     return(res)
 }
 
-prepare_pc_data <- function(source, keyType) {
-    pc2gene <- get_pc_data(source, keyType, output = 'data.frame')
+prepare_pc_data <- function() {
+    pc2gene <- get_pc_data(output = 'data.frame')
     ##TERM2GENE
     pcid2gene <- pc2gene[, c("id", "gene")]
     ##TERM2NAME
