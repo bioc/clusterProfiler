@@ -75,14 +75,28 @@ search_kegg_organism <- function(str, by="scientific_name", ignore.case=FALSE,
 }
 
 
+
 kegg_species_data <- function() {
-    utils::data(list="kegg_species", package="clusterProfiler")
-    get("kegg_species", envir = .GlobalEnv)
+    get_cached_kegg_data("species")
 }
 
 kegg_category_data <- function() {
-    utils::data(list="kegg_category", package="clusterProfiler")
-    get("kegg_category", envir = .GlobalEnv)
+    get_cached_kegg_data("category")
+}
+
+#' @importFrom yulab.utils download_yulab_file
+#' @importFrom yulab.utils get_cache
+#' @importFrom yulab.utils get_cache_item
+get_cached_kegg_data <- function(type = "category") {
+    type <- match.arg(type, c("category", "species"))
+    basefile <- sprintf("kegg_%s", type)
+    file <- sprintf("%s.rda", basefile)
+    urls <- c("https://yulab-smu.top/clusterProfiler",
+              "https://raw.githubusercontent.com/YuLab-SMU/clusterProfiler/refs/heads/gh-pages")
+                  
+    d <- download_yulab_file(file, urls, gzfile=FALSE, appname="clusterProfiler")
+    load(d, envir = get_cache())
+    get_cache_item(basefile)
 }
 
 get_kegg_species <- function(save = FALSE) {
