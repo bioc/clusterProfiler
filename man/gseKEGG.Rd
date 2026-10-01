@@ -11,6 +11,7 @@ gseKEGG(
   exponent = 1,
   minGSSize = 10,
   maxGSSize = 500,
+  eps = 1e-10,
   pvalueCutoff = 0.05,
   pAdjustMethod = "BH",
   verbose = TRUE,
@@ -57,7 +58,7 @@ gseKEGG(
 
 \item{pvalThreshold}{pvalue threshold for adaptive method}
 
-\item{...}{other parameter}
+\item{...}{other parameters passed to \code{enrichit::gsea_gson()}}
 }
 \value{
 gseaResult object
