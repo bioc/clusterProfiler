@@ -13,4 +13,6 @@ __init__.pyc
 
 .vscode/
 .trae
-.env
+.envnsea_go_demo/
+reasonix.toml
+nsea_go_demo/

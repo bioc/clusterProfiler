@@ -21,3 +21,5 @@ inst/sticker
 local_test
 .trae
 .env
+nsea_go_demo/
+reasonix.toml
