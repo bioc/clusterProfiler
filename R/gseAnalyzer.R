@@ -18,7 +18,7 @@
 #' @param pvalueCutoff pvalue Cutoff
 #' @param pAdjustMethod pvalue adjustment method
 #' @param verbose print message or not
-#' @param ... other parameter
+#' @param ... other parameters passed to \code{enrichit::gsea_gson()}
 #' @importClassesFrom enrichit gseaResult
 #' @export
 #' @return gseaResult object
@@ -30,6 +30,7 @@ gseGO <- function(geneList,
                   exponent      = 1,
                   minGSSize     = 10,
                   maxGSSize     = 500,
+                  eps           = 1e-10,
                   pvalueCutoff  = 0.05,
                   pAdjustMethod = "BH",
                   verbose       = TRUE,
@@ -50,6 +51,7 @@ gseGO <- function(geneList,
                           exponent      = exponent,
                           minGSSize     = minGSSize,
                           maxGSSize     = maxGSSize,
+                          eps           = eps,
                           pvalueCutoff  = pvalueCutoff,
                           pAdjustMethod = pAdjustMethod,
                           verbose       = verbose,
@@ -59,7 +61,8 @@ gseGO <- function(geneList,
                           adaptive      = adaptive,
                           minPerm       = minPerm,
                           maxPerm       = maxPerm,
-                          pvalThreshold = pvalThreshold)
+                          pvalThreshold = pvalThreshold,
+                          ...)
   
     
 
@@ -100,7 +103,7 @@ gseGO <- function(geneList,
 #' @param pvalueCutoff pvalue Cutoff
 #' @param pAdjustMethod pvalue adjustment method
 #' @param verbose print message or not
-#' @param ... other parameter
+#' @param ... other parameters passed to \code{enrichit::gsea_gson()}
 #' @export
 #' @return gseaResult object
 #' @author Yu Guangchuang
@@ -110,6 +113,7 @@ gseMKEGG <- function(geneList,
                      exponent          = 1,
                      minGSSize         = 10,
                      maxGSSize         = 500,
+                     eps               = 1e-10,
                      pvalueCutoff      = 0.05,
                      pAdjustMethod     = "BH",
                      verbose           = TRUE,
@@ -128,6 +132,7 @@ gseMKEGG <- function(geneList,
                           exponent       = exponent,
                           minGSSize      = minGSSize,
                           maxGSSize      = maxGSSize,
+                          eps            = eps,
                           pvalueCutoff   = pvalueCutoff,
                           pAdjustMethod  = pAdjustMethod,
                           verbose        = verbose,
@@ -137,7 +142,8 @@ gseMKEGG <- function(geneList,
                           adaptive       = adaptive,
                           minPerm        = minPerm,
                           maxPerm        = maxPerm,
-                          pvalThreshold  = pvalThreshold)
+                          pvalThreshold  = pvalThreshold,
+                          ...)
    
 
     if (is.null(res))
@@ -168,6 +174,7 @@ gseKEGG <- function(geneList,
                     exponent          = 1,
                     minGSSize         = 10,
                     maxGSSize         = 500,
+                    eps               = 1e-10,
                     pvalueCutoff      = 0.05,
                     pAdjustMethod     = "BH",
                     verbose           = TRUE,
@@ -206,6 +213,7 @@ gseKEGG <- function(geneList,
                           exponent         = exponent,
                           minGSSize        = minGSSize,
                           maxGSSize        = maxGSSize,
+                          eps              = eps,
                           pvalueCutoff     = pvalueCutoff,
                           pAdjustMethod    = pAdjustMethod,
                           verbose          = verbose,
@@ -215,7 +223,8 @@ gseKEGG <- function(geneList,
                           adaptive         = adaptive,
                           minPerm          = minPerm,
                           maxPerm          = maxPerm,
-                          pvalThreshold    = pvalThreshold)
+                          pvalThreshold    = pvalThreshold,
+                          ...)
     
 
     if (is.null(res))
