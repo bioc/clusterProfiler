@@ -11,6 +11,12 @@ TODO:
   - e.g. independent test for different omics data and then combine results
 -->
 
+# clusterProfiler 4.20.3
+
++ document the `eps` argument of `GSEA()`, `gseGO()`, `gseKEGG()` and `gseMKEGG()`, which was missing from the `.Rd` files and made `R CMD check` warn "Undocumented arguments ... 'eps'" (2026-10-18, Sun)
+
++ fix `get_kegg_species()` and `kegg_taxa()` for KEGG's retirement of the `organism` special database name: `https://rest.kegg.jp/list/organism` now answers HTTP 400 while the rest of the REST API keeps working, so the weekly "Update KEGG Data" workflow and any `search_kegg_organism(use_internal_data = FALSE)` call failed with "cannot open URL ... HTTP status was '400 Bad Request'". Both now read `/list/genome`, which returns the same organisms as `<T number>\t<code>; <scientific name> (<common name>)`; the species list is parsed from the name and code of that single column. An organism without a common name keeps its scientific name in `common_name`, as it did before (2026-10-18, Sun)
+
 # clusterProfiler 4.19.8
 
 + fix: map non-ENTREZID universe in enrichGO (2026-04-22, Wed)

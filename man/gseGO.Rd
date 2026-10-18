@@ -40,6 +40,8 @@ gseGO(
 
 \item{maxGSSize}{maximal size of genes annotated for testing}
 
+\item{eps}{boundary for calculating the p value in multilevel mode}
+
 \item{pvalueCutoff}{pvalue Cutoff}
 
 \item{pAdjustMethod}{pvalue adjustment method}

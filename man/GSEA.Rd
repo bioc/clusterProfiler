@@ -34,6 +34,8 @@ GSEA(
 
 \item{maxGSSize}{maximal size of genes annotated for testing}
 
+\item{eps}{boundary for calculating the p value in multilevel mode}
+
 \item{pvalueCutoff}{adjusted pvalue cutoff}
 
 \item{pAdjustMethod}{one of "holm", "hochberg", "hommel", "bonferroni", "BH", "BY", "fdr", "none"}

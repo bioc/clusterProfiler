@@ -88,6 +88,7 @@ enricher <- function(gene,
 #' @param exponent weight of each step
 #' @param minGSSize minimal size of each geneSet for analyzing
 #' @param maxGSSize maximal size of genes annotated for testing
+#' @param eps boundary for calculating the p value in multilevel mode
 #' @param nPerm The number of permutations.
 #' @param method method of calculating the pvalue, one of "multilevel", "monte carlo" and "fgsea"
 #' @param adaptive logical, whether to use adaptive method for calculating pvalue
