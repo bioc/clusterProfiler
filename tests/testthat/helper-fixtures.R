@@ -1,5 +1,5 @@
-## 共用 fixture。testthat 只跨文件共享 helper-*.R，所以这些定义不能留在
-## 任何一个 test-*.R 里：另一个测试文件会看不到它们。
+## Shared fixtures. testthat only shares helper-*.R across files, so these
+## definitions cannot live in any test-*.R: another test file would not see them.
 
 ## ---- fixtures -------------------------------------------------------------
 

@@ -1,34 +1,40 @@
-## 通路层面的机制证据。
+## Pathway-level mechanistic evidence.
 ##
-## 与 `evidence()` 的 TF 模式并列，但问的是另一个问题：
-##   不是"哪个 TF 调控这批基因"，而是"这条通路的移动能否被一份实测扰动解释"。
+## Parallel to the TF mode of `evidence()`, but it asks a different question:
+##   not "which TF regulates this gene set", but "can this pathway's movement be explained by a
+##   measured perturbation".
 ##
-## 设计依据 `dev_docs/pathway-mechanism-design.md`。两条核心约束：
+## Designed on `dev_docs/pathway-mechanism-design.md`. Two core constraints:
 ##
-## 1. **候选驱动者由调用方给**（`drivers`）。工具不假装从几千个数据集里发现驱动者——
-##    第 0 期已经测过，那种"谁最像"的排序给不出可用答案（biotrigger 把答案埋在第 18/200）。
-##    这里做的是**检验**：给一个候选，回答"敲掉它会不会让这条通路动"。
-## 2. **每条结论都必须可被推翻**，所以输出带一句 `statement`。不可falsify 的不是机制陈述。
+## 1. **Candidate drivers come from the caller** (`drivers`). The tool does not pretend to discover
+##    a driver among thousands of datasets -- phase 0 already measured that, and a "who looks most
+##    like it" ranking gives no usable answer (biotrigger buried the answer at rank 18/200).
+##    What happens here is **a test**: given a candidate, answer "would knocking it down move this
+##    pathway".
+## 2. **Every conclusion must be refutable**, so the output carries a `statement` line. Something
+##    that cannot be falsified is not a mechanistic claim.
 
-## 通路成员与方向。
+## Pathway members and direction.
 ##
-## 方向优先级：显式的 `pathway_direction` > 从成员基因的 log2FC 推断。
-## 两者都没有时方向为 NA——**不猜**。没有方向的通路无法检验，只能给 C 级。
+## Direction priority: an explicit `pathway_direction` > inference from the members' log2FC.
+## With neither, direction is NA -- **no guessing**. A pathway without direction cannot be tested and
+## can only be given level C.
 .pathway_members <- function(result) {
     if (is.null(result$geneID)) return(character(0))
     tok <- trimws(unlist(strsplit(as.character(result$geneID), "/")))
-    ## 空 token 与 NA 都不是成员。不过滤的话：
-    ##   * `"A/B/C/D/E/"` 会数出 6 个成员，`n_members` 与陈述里的数字都多 1
-    ##     （实测带尾斜杠与空格时得到 6 而不是 5）；
-    ##   * `geneID = NA` 会得到一个叫 "NA" 的成员，于是"没有成员"被报成 1 个。
-    ## 两者都会影响 `n_members < 5` 这个 `too-small` 判据的边界。
+    ## Empty tokens and NA are not members. Unfiltered:
+    ##   * `"A/B/C/D/E/"` counts 6 members, so `n_members` and the number in the statement are both
+    ##     one too high (measured: a trailing slash and a space gave 6 instead of 5);
+    ##   * `geneID = NA` yields a member called "NA", so "no members" is reported as 1.
+    ## Both move the boundary of the `n_members < 5` `too-small` criterion.
     unique(tok[!is.na(tok) & nzchar(tok)])
 }
 
-## 方向从哪来，决定 `support` 能不能当证据用。
-##   "given"   —— 结果自己写明（外部信息，support 独立）
-##   "nes"     —— GSEA 的 NES 符号（外部信息，support 独立）
-##   "members" —— 由成员多数推导（**support 因此是恒真的**，见 .pathway_direction_source）
+## Where direction comes from decides whether `support` can be used as evidence.
+##   "given"   -- the result states it itself (external information, support is independent)
+##   "nes"     -- the sign of GSEA's NES (external information, support is independent)
+##   "members" -- inferred from the member majority (**so support is vacuously true**; see
+##               .pathway_direction_source)
 .pathway_direction_source <- function(result, signed) {
     if (!is.null(result$pathway_direction) && !is.na(result$pathway_direction)) return("given")
     if (!is.null(result$NES) && !is.na(result$NES)) return("nes")
@@ -57,10 +63,12 @@
     if (n_up > n_down) "up" else if (n_down > n_up) "down" else NULL
 }
 
-## 成员方向一致性：方向一致且过阈值的成员占比。
+## Member direction agreement: the share of members that move the pathway's way and clear the
+## threshold.
 ##
-## 这条存在的理由与旧 spec 的 `support` 相同——少数基因驱动的高分不能算整条通路的支持。
-## 一条 33 个成员的通路里若只有 5 个朝同一方向，那不是"通路在动"，是"几个基因在动"。
+## It exists for the same reason as `support` in the old spec -- a high score driven by a few genes
+## cannot count as support for the whole pathway. When only 5 of a 33-member pathway move the same
+## way, that is not "the pathway is moving", it is "a few genes are moving".
 .pathway_support <- function(members, signed, direction) {
     if (is.null(signed) || !length(signed) || is.null(direction)) return(NA_real_)
     hit <- members[members %in% names(signed)]
@@ -70,11 +78,12 @@
     mean(want)
 }
 
-## 把候选驱动基因解析成 GPSAdb 数据集。
+## Resolve a candidate driver gene into GPSAdb datasets.
 ##
-## 一个基因可能有多份数据集。全部取回，逐一检验，取最强的那一份——
-## 但把用了哪一份记下来，因为"同一个基因在不同细胞系里表现不同"是真实存在的
-## （第 0 期里 VHL 在 HK-2 上就不符合预期）。
+## One gene may have several datasets. All of them are fetched and tested one by one, and the
+## strongest is used -- but which one was used is recorded, because "the same gene behaves
+## differently in different cell lines" really happens (in phase 0, VHL did not match expectation in
+## HK-2).
 .pathway_datasets <- function(gene, limit = 5L) {
     .pathway_dataset_lookup(gene, limit)$data
 }
@@ -87,15 +96,16 @@
 ## or a machine without the suggested `gpsadb` package -- a false statement about
 ## the database, and the same confusion the inventory lookup was fixed for.
 .pathway_dataset_lookup <- function(gene, limit = 5L) {
-    ## 先用包里已有的别名表归一，再查。
+    ## Normalise through the alias table the package already ships, then query.
     ##
-    ## 不归一会**静默查空**：GPSAdb 里 `GR` 有 0 个敲低数据集，`NR3C1` 有 1 个；
-    ## 调用方写 `drivers = "GR"` 是自然的，得到的是"这个驱动者没有任何数据"，
-    ## 输出与"数据里确实不支持它"长得一模一样。这一条在 airway 上的实测就是这样：
-    ## 9 条通路全部 C，看不出是别名问题。
-    ## 别名表是**单向**的（`NR3C1 -> GR`），而调用方与数据库可能各站一端：
-    ## GPSAdb 里 `NR3C1` 有数据、`GR` 没有，而用户写 `drivers = "GR"` 最自然。
-    ## 所以双向都试，谁先查到用谁。
+    ## Without normalisation the lookup **silently comes back empty**: in GPSAdb `GR` has 0
+    ## knockdown datasets and `NR3C1` has 1; a caller writing `drivers = "GR"` is being natural and
+    ## gets "this driver has no data at all", which looks exactly like "the data really does not
+    ## support it". Measured on airway this is precisely what happens: all 9 pathways C, with no
+    ## sign that aliasing was the problem.
+    ## The alias table is **one-way** (`NR3C1 -> GR`), while caller and database may each sit at
+    ## either end: in GPSAdb `NR3C1` has data and `GR` does not, and users most naturally write
+    ## `drivers = "GR"`. So try both directions and use whichever hits first.
     aliases <- tryCatch(mechanism_regulator_aliases(), error = function(e) character(0))
     back <- if (length(aliases)) names(aliases)[aliases == gene] else character(0)
     fwd <- tryCatch(mechanism_alias_regulator(gene), error = function(e) gene)
@@ -134,8 +144,8 @@
         }
         d <- .pathway_usable_datasets(got$d)
         if (is.null(d)) next
-        ## 每个细胞系先留一份（样本多的），保证取到的几份尽量来自不同系——
-        ## 复现判定看的是细胞系数，不是数据集数。
+        ## Keep one dataset per cell line first (the one with more samples), so the few that are
+        ## taken come from different lines -- the reproduction call counts cell lines, not datasets.
         if ("n_samples" %in% names(d)) d <- d[order(-d$n_samples), , drop = FALSE]
         d <- d[!duplicated(d$cell_line), , drop = FALSE]
         return(list(data = utils::head(d, limit), errors = errors))
@@ -176,10 +186,11 @@
     if (!nrow(d)) NULL else d
 }
 
-## 单细胞系那一路取复现行。**别名要在两侧都解析**：GPSAdb 返回的是
-## `NR3C1`，而用户的 `mechanism_reproduction()` 表可能用别名 `GR` 建成。
-## 不解析时匹配静默返回 0 行，措辞悄悄退回默认——GR 恰好是 P4 里两个
-## B 级案例的驱动者，这个洞就是在那里被发现的。
+## Pick up the reproduction row on the single-cell-line branch. **Aliases must be resolved on both
+## sides**: GPSAdb returns `NR3C1`, while the caller's `mechanism_reproduction()` table may have been
+## built with the alias `GR`. Unresolved, the match silently returns 0 rows and the wording quietly
+## falls back to the default -- GR happens to be the driver of the two level-B cases in P4, and that
+## is where this hole was found.
 .pe_reproduction_row <- function(gene, pathway, reproduction) {
     if (is.null(reproduction) || !nrow(reproduction)) return(NULL)
     if (!all(c("driver", "pathway") %in% names(reproduction)))
@@ -189,14 +200,15 @@
                  as.character(reproduction$pathway) == pathway, , drop = FALSE]
 }
 
-## 单细胞系那一路的措辞。抽成函数是为了**能单独测**：三个分支（复现 / 不复现 /
-## 无第二份数据）必须彼此可区分，内联在 `pathway_evidence()` 里就只能靠跑真数据验证。
+## Wording for the single-cell-line branch. Factored out so it **can be tested on its own**: the
+## three branches (reproduced / not reproduced / no second dataset) must stay distinguishable, and
+## inline inside `pathway_evidence()` they could only be checked by running real data.
 ##
-## 分级来自 `mechanism_reproduction()`（spec §4.3）：
-##   reproduces      → 说清复现了几份独立数据
-##   consistent      → 保持原措辞
-##   not-reproduced  → 明确写成未验证
-##   not-computable  → 与 not-reproduced 同口径，不能默认算通过
+## Grades come from `mechanism_reproduction()` (spec Section 4.3):
+##   reproduces      -> say how many independent datasets reproduced it
+##   consistent      -> keep the original wording
+##   not-reproduced  -> state plainly that it is unverified
+##   not-computable  -> same reading as not-reproduced; must not count as a pass by default
 .pe_single_line_statement <- function(gene, n_members, dataset, padj, row) {
     base <- sprintf(
         "Knocking down candidate %s moves these %d members opposite the observed pathway direction in %s (padj %.2g), with one supporting cell line.",
@@ -291,38 +303,42 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                              reproduction = NULL) {
     d <- if (is.data.frame(x)) x else as.data.frame(x)
     if (!nrow(d)) {
-        ## 空输入也要出声。没有这句时，用户拿到一个空 data.frame，无法分辨
-        ## "富集本来就没结果"与"函数出问题了"——实测两个数据集（雌二醇、以及其他
-        ## 富集不到任何通路的条件实验）就停在这一步。
+        ## An empty input must still speak up. Without this line the user gets an empty data.frame
+        ## and cannot tell "the enrichment genuinely had no result" from "the function broke" --
+        ## measured, two datasets (estradiol, and other condition experiments that enrich nothing)
+        ## stop right here.
         warning(paste("The enrichment result holds no pathways, so there is nothing to score.",
                       "That is usually the condition experiment failing to concentrate its response,",
                       "not a fault in pathway_evidence."), call. = FALSE)
         return(.pathway_evidence_empty(drivers))
     }
-    ## 守卫放在 `head()` **之后**。只放在前面时，`max_pathways = 0L` 会得到 0 行的 d，
-    ## 后面的 `do.call(rbind, list())` 返回 NULL，`attr(out, ...)` 就报
-    ## "attempt to set an attribute on NULL"——一条指不出原因的错误。
+    ## The guard sits **after** `head()`. Placed before it, `max_pathways = 0L` left d with 0 rows,
+    ## the later `do.call(rbind, list())` returned NULL, and `attr(out, ...)` failed with
+    ## "attempt to set an attribute on NULL" -- an error that names no cause.
     max_pathways <- max(1L, as.integer(max_pathways)[1])
     d <- utils::head(d, max_pathways)
     if (!nrow(d)) return(.pathway_evidence_empty(drivers))
 
-    ## 标识空间：**自动识别并翻译**，不让调用方每次自己 bitr。
+    ## Identifier space: **detect and translate automatically**, instead of making the caller bitr
+    ## every time.
     ##
-    ## ReactomePA 吐 Entrez、GPSAdb 只认 Symbol，而这两个来源的组合正是主路径。
-    ## 早先要求调用方自己转，代价是有人忘了就得到一个"跑通了、什么都没发生"的结果
-    ## ——0.8 秒、零次网络调用、全部 untestable。识别成本很低（看成员是否像纯数字），
-    ## 让它自动做比让人记住更可靠。
+    ## ReactomePA returns Entrez, GPSAdb only understands symbols, and the combination of those two
+    ## sources is the main path. Earlier the caller had to convert, at the cost of anyone who forgot
+    ## getting a "ran fine, nothing happened" result -- 0.8 seconds, zero network calls, everything
+    ## untestable. Detection is cheap (do the members look purely numeric), so doing it
+    ## automatically is more reliable than asking people to remember.
     d <- .pathway_ids_to_symbols(d, signed)
 
-    ## 标识空间守卫。
+    ## Identifier-space guard.
     ##
-    ## ReactomePA 的 `geneID` 是 **Entrez**，而 GPSAdb 与多数差异表用的是 **Symbol**。
-    ## 两者对不上时，每个通路的成员一个都匹配不上 `signed`，方向推不出来、支持率是 NA，
-    ## 结果是**全部 untestable，但看起来像正常的空结论**——实测 0.8 秒跑完、一个网络
-    ## 调用都没发。这种"跑通了、什么都没发生"比报错危险得多。
+    ## ReactomePA's `geneID` is **Entrez**, while GPSAdb and most differential tables use **Symbols**.
+    ## When the two do not line up, no member of any pathway can match `signed`, direction cannot be
+    ## inferred, support is NA, and the result is **everything untestable while looking like a normal
+    ## null conclusion** -- measured, it finished in 0.8 seconds without sending a single network
+    ## call. That "ran fine, nothing happened" is far more dangerous than an error.
     ##
-    ## 判据用"一条通路都没匹配上"：只要有一条匹配到，就说明空间是通的，
-    ## 少数通路匹配不到是正常的（成员不在差异表里）。
+    ## The criterion is "not one pathway matched": as soon as one matches, the spaces are connected,
+    ## and a few unmatched pathways are normal (their members are not in the differential table).
     if (!is.null(signed) && length(signed) && nrow(d)) {
         any_hit <- any(vapply(seq_len(nrow(d)), function(i) {
             m <- .pathway_members(d[i, ])
@@ -337,9 +353,11 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
         }
     }
 
-    ## 候选数据集只解析一次，不按通路重复查——同一个驱动者在几十条通路上是同一批数据集。
-    ## `lookup` 记录每个候选的解析结果：拿到数据、成功但为空、还是查询本身失败。
-    ## 三者混同会让一次断网印成"GPSAdb 里没有这个因子的数据"。
+    ## Candidate datasets are resolved once, not re-queried per pathway -- one driver has the same
+    ## datasets across dozens of pathways.
+    ## `lookup` records each candidate's resolution: data found, succeeded but empty, or the query
+    ## itself failed. Conflating the three would print "GPSAdb has no data for this factor" after a
+    ## network outage.
     sets <- list()
     lookup <- list()
     if (length(drivers)) {
@@ -356,11 +374,13 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                    stringsAsFactors = FALSE)
     failed <- lookup$driver[lookup$status %in% "failed"]
 
-    ## A 级不可达这件事在**驱动者层面**就能确定，不必从每个通路的 `reason` 去反推。
+    ## That level A is unreachable can be settled **at the driver level**, without back-inferring it
+    ## from each pathway's `reason`.
     ##
-    ## 早先的写法是等结果出来看原因分布，实测漏报：airway 那批通路里一半是方向冲突、
-    ## 一半是成员分散，没有"单一主导原因"，于是明明 GR 只有一个细胞系却没报。
-    ## 判据放在这里更直接、也不会误报。
+    ## The earlier version waited for the results and then looked at the distribution of reasons,
+    ## and it under-reported: half the airway pathways were direction conflicts and half were split
+    ## members, so there was no "single dominant reason" and GR's single cell line went unreported.
+    ## The criterion belongs here, where it is both more direct and not prone to false alarms.
     if (length(sets)) {
         cells_each <- vapply(sets, function(z) {
             cells <- trimws(as.character(z$cell_line))
@@ -391,12 +411,13 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
             paste0("`", paste(failed, collapse = "`, `"), "`")), call. = FALSE)
     }
 
-    ## 按 (数据集, 成员签名) 记忆化。
+    ## Memoise by (dataset, member signature).
     ##
-    ## 不能按通路缓存——测试结果取决于成员，换了通路就是另一次检验。但**不同通路
-    ## 常常共享完全相同的成员集**：缺氧结果里 `response to hypoxia`、
-    ## `response to decreased oxygen levels`、`response to oxygen levels` 三个
-    ## 都是同一批 33 个基因，原来各测一遍。签名相同时复用是安全的，因为请求完全相同。
+    ## Caching per pathway is wrong -- the result depends on the members, and a different pathway is
+    ## a different test. But **different pathways often share exactly the same member set**: in the
+    ## hypoxia result `response to hypoxia`, `response to decreased oxygen levels` and `response to
+    ## oxygen levels` are the same 33 genes and used to be tested three times over. Reusing on an
+    ## identical signature is safe because the request is identical.
     memo <- new.env(parent = emptyenv())
     calls <- 0L
     fails <- 0L
@@ -437,14 +458,17 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
         direction <- .pathway_direction(d[i, ], members, signed)
         support <- .pathway_support(members, signed, direction)
         desc <- .pathway_label(d[i, ])
-        ## 先给默认值：下面的"无方向"分支会提前 return，那时检验还没跑，
-        ## 但已经要填 `n_tests_run` 这一列。
+        ## Default first: the "no direction" branch below returns early, before any test has run,
+        ## yet it still has to fill the `n_tests_run` column.
         n_tested <- 0L
 
-        ## 没有方向有两种，必须是两个结论，不是一个：
-        ##   * `signed` 没给 —— 我们没有测过成员往哪边走，这是**没测**；
-        ##   * `signed` 给了但成员对半分 —— 测过了，它们没有共同方向，这是**测了不成立**。
-        ## 混成一句"没有方向"会把后者说成缺失，与 `absent` / `untested` 分开是同一条纪律。
+        ## No direction has two causes, and they must be two conclusions, not one:
+        ##   * `signed` was not supplied -- we never measured which way the members moved, this is
+        ##     **untested**;
+        ##   * `signed` was supplied but the members split evenly -- measured, they have no common
+        ##     direction, this is **tested and not supported**.
+        ## Merging them into one "no direction" calls the latter missing, and keeping it apart from
+        ## `absent` / `untested` is the same discipline.
         if (is.null(direction)) {
             for (g in names(sets)) {
                 for (j in seq_len(nrow(sets[[g]]))) {
@@ -453,13 +477,15 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                 }
             }
             untested <- is.null(signed) || !length(signed)
-            ## 这里其实是**三个**结论，不是一个：
-            ##   * 没给 `signed`            -> no-fold-changes（没测）
-            ##   * 给了但一个成员都不在里面  -> no-members（这批基因不在差异表里）
-            ##   * 给了、有成员、但正负对半  -> no-direction（测了，没有共同方向）
-            ## 原来后两者共用 "Members split evenly"，于是一条 0 成员的通路
-            ## （例如 `geneID` 为 NA 或全是不认识的名字）也说成"成员对半分"——
-            ## 与 `why_c` 那边把 member-derived 并进 low-support 是同一类错误。
+            ## Here there are really **three** conclusions, not one:
+            ##   * no `signed`            -> no-fold-changes (untested)
+            ##   * supplied, no member in it -> no-members (these genes are not in the differential
+            ##     table)
+            ##   * supplied, members present, split evenly -> no-direction (tested, no common
+            ##     direction)
+            ## The last two used to share "Members split evenly", so a pathway with 0 members (e.g.
+            ## `geneID` NA or all unrecognised names) was also called "members split evenly" -- the
+            ## same class of error as folding member-derived into low-support in `why_c`.
             hit <- if (untested) character(0) else members[members %in% names(signed)]
             why <- if (untested) "no-fold-changes"
                 else if (!length(hit)) "no-members"
@@ -479,11 +505,12 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                 stringsAsFactors = FALSE))
         }
 
-        ## 逐个候选驱动者的**每一份**数据集都检验，不只看最强的那一份。
+        ## Test **every** dataset of every candidate driver, not just the strongest one.
         ##
-        ## 原版只留 padj 最小的一个，于是 A 级等于"某一份数据支持"。实测这个含义太弱：
-        ## 四个驱动者里三个换一个细胞系就不成立，而且效应量符号翻转
-        ## （`results/stage3_refutation.tsv`）。所以要看得见全部数据集，才能判断复现。
+        ## The original kept only the smallest padj, so level A meant "one dataset supports it".
+        ## Measured, that meaning is far too weak: three of four drivers stopped holding in another
+        ## cell line, and the effect sign flipped (`results/stage3_refutation.tsv`). All datasets
+        ## have to be visible for reproduction to be judgeable.
         tested <- list()
         n_attempt <- 0L
         n_fail <- 0L
@@ -493,13 +520,15 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                 got <- ask(id, members)
                 record_test(desc, g, id, as.character(sets[[g]]$cell_line[j]), direction, got)
                 n_attempt <- n_attempt + 1L
-                ## 调用失败与"调用成功但没结果"必须分开。
-                ## 原来两者都是 `next`，于是一次断网会让 `tested` 变空，
-                ## 再被解释成"成员方向不一致"——实测 HIF1A（4 个细胞系）在
-                ## 模拟断网下得到 `low-support`、零报警，用户看不出是网络问题。
+                ## A failed call and a call that succeeded with no result must stay apart.
+                ## Both used to be `next`, so one outage emptied `tested`, which was then read as
+                ## "the members disagree in direction" -- measured, HIF1A (4 cell lines) came back
+                ## as `low-support` under a simulated outage with zero warnings, and the user could
+                ## not see it was the network.
                 if (isTRUE(got$.failed)) { n_fail <- n_fail + 1L; next }
                 if (!is.finite(got$padj) || !is.finite(got$es) || got$es == 0) next
-                ## 同一个数据集可能被两个驱动者指向同一个基因的别名，只记一次。
+                ## The same dataset may be reached through two drivers aliasing the same gene; record
+                ## it once.
                 already <- vapply(tested, function(z) identical(z$dataset, id) &&
                                   identical(z$gene, g), TRUE)
                 if (any(already)) next
@@ -509,7 +538,8 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                     es = got$es, padj = got$padj)
             }
         }
-        ## 最强的显著者决定"提出主张"的那一份；复现则要求**另一个细胞系**也显著且同向。
+        ## The strongest significant result is the one a claim is made on; reproduction requires
+        ## that **another cell line** is also significant and in the same direction.
         best <- NULL
         for (cand in tested) {
             if (is.na(cand$padj) || cand$padj >= alpha) next
@@ -517,12 +547,14 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
         }
         n_tested <- length(tested)
 
-        ## 检验没能跑起来有两种外部原因，都要**盖过** `no-perturbation-test`：
-        ##   * 调用全失败（断网、上游挂了）—— 这是临时故障，不是数据性质；
-        ##   * 驱动者在 GPSAdb 里没有任何数据集 —— 这是数据供给问题，用户能去补。
-        ## 原来这两种情况在"方向来自外部且支撑率够"的通路上会被 B 分支抢先命中，
-        ## 一律说成 "no perturbation test identified a driver"——实测断网时
-        ## 就是这句话，看不出是网络问题。
+        ## A test that could not run has two external causes, and both must **override**
+        ## `no-perturbation-test`:
+        ##   * every call failed (outage, upstream down) -- a temporary fault, not a property of the
+        ##     data;
+        ##   * the driver has no dataset at all in GPSAdb -- a data supply problem the user can fix.
+        ## Both used to be caught first by the B branch on pathways with external direction and
+        ## enough support, and all of them were called "no perturbation test identified a driver" --
+        ## measured, that is what an outage printed, with no sign it was the network.
         blocked <- if (n_attempt > 0L && n_fail == n_attempt) "no-test-completed"
             else if (length(drivers) && !length(sets))
                 if (length(failed)) "lookup-failed" else "no-dataset"
@@ -544,32 +576,38 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
 
         if (!is.null(best) && best$padj < alpha &&
             (!is.na(support) && support >= min_support)) {
-            ## 显著性还不够：**方向必须对得上**。
-            ## 通路往上走、驱动者被敲低，那这条通路应当**回落**（es < 0）——这说明
-            ## 该因子在启动它。若敲低后通路反而**更往上**（es > 0），那它是在压制，
-            ## 不是驱动。原版不看这一点，把任何显著结果都记成支持。
+            ## Significance is not enough: **the direction must line up**.
+            ## If the pathway runs up and its driver is knocked down, the pathway should **fall
+            ## back** (es < 0) -- that says the factor switches it on. If knocking it down pushes the
+            ## pathway **further up** (es > 0) then the factor was repressing it, not driving it.
+            ## The original ignored this and recorded any significant result as support.
             effect <- if (is.na(best$es) || is.na(direction)) NA_character_ else
                 if ((direction == "up" && best$es < 0) ||
                     (direction == "down" && best$es > 0)) "activator" else "repressor"
             agrees <- is.na(effect) || effect == "activator"
-            ## A 级要求**复现**：至少两个不同细胞系都显著且同向。
-            ## 单份数据支持降为 B 并标记 `single-dataset`——它不是没有证据，
-            ## 是证据只有一个来源，而实测这种证据有 3/4 会在换数据后翻转。
+            ## Level A demands **reproduction**: at least two different cell lines, both significant
+            ## and in the same direction.
+            ## Single-dataset support drops to B and is marked `single-dataset` -- not because there
+            ## is no evidence, but because the evidence has one source, and measured, 3/4 of such
+            ## evidence flips when the data changes.
             level <- if (agrees && replicated) "A" else "B"
             verdict <- if (!agrees) "direction-conflict"
                        else if (replicated) "perturbation-supported"
                        else "single-dataset"
-            ## A 级的陈述必须点到它**没**建立的东西。实测：同一条缺氧通路上，
-            ## 从库里随机取 30 个驱动者，有 4 个（全是剪接/RNA 加工/多梳这类必需基因）
-            ## 同样拿到 A——必需基因敲低造成转录组大乱，任何十几到几十个成员的通路都会跟着动。
-            ## 所以"敲掉它会动"是真的，"它就是驱动者"不是。
+            ## A level-A statement must name what it did **not** establish. Measured, on the same
+            ## hypoxia pathway, 4 of 30 drivers drawn at random from the inventory (all essential
+            ## genes of the splicing / RNA processing / Polycomb kind) also reached A -- knocking down
+            ## an essential gene derails the transcriptome and any pathway of a dozen to a few dozen
+            ## members moves with it. So "knocking it down moves this" is true, "it is the driver"
+            ## is not.
             statement <- if (agrees && replicated) sprintf(
                 "If %s drives this programme, knocking it down should move these %d members; %s does (padj %.2g) and %d cell lines agree. Consistent with drive, but not evidence that %s is the driver.",
                 best$gene, length(members), best$dataset, best$padj, length(cells_agree), best$gene)
-            ## 只有一份数据支持时，读法要写清：**这是数据不够，不是证据反对**。
-            ## 实测（11 个已知真值的数据集）：B 级里指向正确驱动者的有 2 个
-            ## （airway 与 GSE286890 的 GR），被"单细胞系降级"压住的都对。
-            ## 原来的措辞只是一句降级说明，读者会把它当次品。
+            ## With single-dataset support the reading must be spelled out: **this is not enough
+            ## data, not evidence against**. Measured (11 known-truth datasets): 2 of the level-B rows
+            ## pointed at the correct driver (GR in airway and GSE286890), and both rows held down by
+            ## the "single cell line" demotion were right. The old wording was only a demotion note,
+            ## so readers took it as defective.
             else if (agrees) .pe_single_line_statement(
                 best$gene, length(members), best$dataset, best$padj,
                 .pe_reproduction_row(best$gene, desc, reproduction))
@@ -589,25 +627,29 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                 effect = effect, n_tests_run = n_tested,
                 n_cell_lines_supported = length(cells_agree),
                 level = level, verdict = verdict,
-                ## 降级原因要**写出来**。`single-dataset` 与 `direction-conflict` 都落在 B，
-                ## 但一个是"证据不够多"，一个是"证据指向相反"——读者必须能分开。
+                ## The demotion reason must be **written out**. `single-dataset` and
+                ## `direction-conflict` both land on B, but one is "not enough evidence" and the
+                ## other "the evidence points the opposite way" -- the reader has to be able to
+                ## separate them.
                 reason = if (level == "A") NA_character_
                     else if (!agrees) "direction-conflict" else "single-cell-line",
                 statement = statement,
                 stringsAsFactors = FALSE))
         }
 
-        ## 没有实测支持时，成员方向一致只能算弱证据（B 级）——而且**只有当方向来自外部时**才算。
+        ## Without measured support, agreeing members are only weak evidence (level B) -- and only
+        ## **when the direction comes from outside**.
         ##
-        ## 方向若由成员多数推导，`support` 就是恒真的（多数必然 >= 50%），拿它当证据
-        ## 等于用同一批基因既定方向又证方向。这是审核时发现的：`min_support = 0.5`
-        ## 永远成立，B 级因此没有信息量。
+        ## If direction is inferred from the member majority then `support` is vacuously true (a
+        ## majority is necessarily >= 50%), so using it as evidence both fixes the direction and
+        ## proves it with the same genes. Found in review: `min_support = 0.5` always held, which left
+        ## level B with no information.
         if (is.na(blocked) && !is.na(support) && support >= min_support && dsrc != "members") {
-            ## 检验**跑过**但都不显著，与**没跑过**是两件事。
-            ## 原来两者共用 `coherent-untested` / `no-perturbation-test`，
-            ## 于是一次跑了 4 个数据集、全不显著的通路报告"没有检验能指出驱动者"——
-            ## 读者分不清"测了不支持"与"根本没测"，`untested` 这个词在测过之后
-            ## 本身就是错的。
+            ## A test that **ran** and found nothing significant, and one that **never ran**, differ.
+            ## Both used to share `coherent-untested` / `no-perturbation-test`, so a pathway where 4
+            ## datasets were tested and none was significant reported "no perturbation test could
+            ## point at a driver" -- the reader could not tell "tested and not supported" from
+            ## "never tested", and the word `untested` is simply wrong once testing has happened.
             ran <- length(tested) > 0L
             return(data.frame(
                 pathway = desc, direction = direction, n_members = length(members),
@@ -626,25 +668,31 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
                 stringsAsFactors = FALSE))
         }
 
-        ## 走到这里的 C 有三种完全不同的含义，必须分开写：
-        ##   * 成员不在差异表里            -> no-members
-        ##   * 成员对不上、方向无外部依据   -> low-support / member-derived
-        ##   * 检验跑了但一份都没给出 p 值  -> too-small（通路太小）
-        ##   * 检验跑了、都不显著          -> not-significant
-        ## 原来它们全是 `C unsupported`，读者无法分辨"没找到"与"没法找"。
-        ## 顺序有讲究：成员只有个位数时，**这才是要报的原因**。
-        ## 一个 2 成员的通路，方向只能从这 2 个基因自己推出来，于是必然落到
-        ## `low-support`——但读者看到"成员方向不一致"会去改方向策略，
-        ## 实际问题是他给的差异基因太少。实测 MCF-7（23 个上调）与 A549 依托泊苷
-        ## （16 个上调）都因此被误标成 low-support。
-        ## `member-derived` 与 `low-support` **必须分开**。原来合成一个 "low-support"，
-        ## 于是 support = 100% 的通路也印出"低于 50% 的下限"——上一轮我以为修了，
-        ## 实际加的那条 `else` 分支永远走不到，因为 why_c 从不会取到它。
-        ## 这次每个值都有明确来源，`statement` 用 `switch` 一一对应，不留兜底。
-        ## `no-test-completed` 排在 `member-derived` 之前：一次调用全崩时，
-        ## "检验没能跑起来"比"方向由成员推导"更该被看见——否则用户会以为自己
-        ## 的输入有问题，实际是网络。实测断网时逐条 reason 曾显示 `member-derived`，
-        ## 只有全局 warning 说得出真相，两层信息不一致。
+        ## A C row that gets here has three completely different meanings, and they must be told
+        ## apart:
+        ##   * members are not in the differential table          -> no-members
+        ##   * members do not line up, direction has no external basis -> low-support / member-derived
+        ##   * tests ran but none produced a p-value             -> too-small (pathway too small)
+        ##   * tests ran and none was significant                -> not-significant
+        ## All of them used to be `C unsupported`, and the reader could not tell "not found" from
+        ## "could not be looked for".
+        ## The order matters: when members number in the single digits, **that is the reason to
+        ## report**. A 2-member pathway can only take its direction from those 2 genes, so it
+        ## necessarily lands on `low-support` -- but a reader seeing "members disagree" will go and
+        ## change the direction strategy when the real problem is too few differential genes.
+        ## Measured, MCF-7 (23 up-regulated) and A549 etoposide (16 up-regulated) were both
+        ## mislabelled low-support for this reason.
+        ## `member-derived` and `low-support` **must stay apart**. They were merged into one
+        ## "low-support", so a pathway with support = 100% printed "below the 50% floor" -- I thought
+        ## that was fixed last round, but the `else` branch added for it could never be reached,
+        ## because why_c never took that value.
+        ## This time every value has a definite source and `statement` maps one-to-one through
+        ## `switch`, with no catch-all.
+        ## `no-test-completed` is ordered before `member-derived`: when every call collapses, "the
+        ## test could not run" deserves to be seen more than "direction was inferred from members" --
+        ## otherwise users think their input is wrong when it is the network. Measured during an
+        ## outage, the per-row reason once showed `member-derived` and only the global warning told
+        ## the truth, so the two layers disagreed.
         ## `support` is NA for two different inputs: no `signed` list at all, or
         ## members that are not in it. Reporting both as "members were not found
         ## in the signed gene list" misdiagnosed the first case -- a documented
@@ -670,9 +718,10 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
             effect = NA_character_, n_tests_run = n_tested,
             n_cell_lines_supported = 0L, level = "C", verdict = "unsupported",
             reason = why_c,
-            ## 陈述必须与 `why_c` 一致。原先只有一句"低于支持下限"，但 `support` 是 100%
-            ## 时也走这里（原因是方向由成员自身推导），于是输出"100% 的成员上调，
-            ## 低于 50% 的下限"这种自相矛盾的话。实测 airway 上就这么印出来了。
+            ## The statement must agree with `why_c`. There used to be only "below the support
+            ## floor", but support = 100% also comes through here (because the direction was
+            ## inferred from the members themselves), so it printed the self-contradiction "100% of
+            ## members moved up, below the 50% floor". Measured, that is what airway printed.
             statement = switch(why_c,
                 "no-members" = "Members were not found in the signed gene list; the pathway's movement is unknown.",
                 "no-fold-changes" = "No signed fold changes were supplied, so member support is unknown; perturbation evidence is retained in the ledger but cannot establish the pathway's direction.",
@@ -692,11 +741,12 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
 
     out <- do.call(rbind, rows)
 
-    ## 跨源一致这一终点已移除，原因写在设计文档 §6.4：
-    ## 三种第二来源（PPI 密度、成员重叠、GO↔Reactome 官方映射）实测都不成立，
-    ## 而这一列在主路径下恒为 `no-crossref`——它不影响任何判定，留着会让读者
-    ## 以为做过一次验证。**一个恒定的空结论比没有这一列更误导。**
-    ## 要恢复，先有能成立的第二来源，而不是先有这一列。
+    ## The cross-source concordance endpoint was removed, for the reason written in the design
+    ## document Section 6.4: all three second sources (PPI density, member overlap, the official
+    ## GO<->Reactome mapping) failed when measured, and on the main path this column is always
+    ## `no-crossref` -- it changes no verdict, and keeping it would make readers think a validation
+    ## had been done. **A constant null conclusion misleads more than a missing column.**
+    ## Restoring it needs a second source that holds up first, not this column first.
 
     out <- out[order(match(out$level, c("A", "B", "C")), -out$support), , drop = FALSE]
     attr(out, "drivers") <- drivers
@@ -705,13 +755,15 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
     attr(out, "perturbation_tests") <- if (length(perturbation_tests))
         do.call(rbind, perturbation_tests) else .pathway_perturbation_tests_empty()
 
-    ## 结构性上限要**说出来**，不能只体现在等级上。
+    ## A structural ceiling must be **said out loud**, not just show up in the grade.
     ##
-    ## 没有这一段时，`全部 B` / `全部 C` 与"测了、不支持"完全同形——而实测九次里
-    ## 有五次的低等级来自外部缺数据（GR 只有 1 个细胞系、通路太小、差异基因太少），
-    ## 不是方法判断的结果。读者看不出差别，就会把"没法看"读成"没有证据"。
-    ## 全部调用失败时直接说，不看 reason 分布——这是一次调用层面的故障，
-    ## 任何等级都不该被当真。
+    ## Without this block, "all B" / "all C" looks exactly like "tested and not supported" -- and
+    ## measured, five of nine times the low grade came from externally missing data (GR has only 1
+    ## cell line, the pathways are too small, too few differential genes), not from a judgement the
+    ## method made. A reader who cannot see the difference reads "cannot be assessed" as "no
+    ## evidence".
+    ## When every call failed, say so directly without looking at the reason distribution -- that is
+    ## a fault at the call level, and no grade should be taken seriously.
     outage <- calls > 0L && fails == calls
     if (outage) {
         warning(sprintf("All %d GPSAdb calls failed. No perturbation evidence was collected; every grade below reflects an outage, not the data. Check the connection and rerun.", calls),
@@ -720,13 +772,13 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
         warning(sprintf("%d of %d GPSAdb calls failed; perturbation evidence is incomplete. Inspect attr(result, 'perturbation_tests') and rerun.", fails, calls),
                 call. = FALSE)
     }
-    ## 断网时不再重复第二条：`_pathway_warn_capped` 那句说的正是同一件事。
-    ## 一次故障发两条同义 warning 只会让人以为是两个问题。
+    ## No second message during an outage: the `_pathway_warn_capped` line says the same thing.
+    ## Two synonymous warnings for one fault only make it look like two problems.
     if (!outage) .pathway_warn_capped(out, names(sets), failed)
-    ## 必须设 class，否则 `print.pathway_evidence` 永远不会被派发。
-    ## 实测这份代码从写出来到现在**一次都没执行过**：返回的是裸 data.frame，
-    ## 用户看到的是 20 列的原始表格，`reason` / `capped by` 那些行一个都没印。
-    ## 又一个"看起来写好了、其实没跑"的例子。
+    ## The class must be set, otherwise `print.pathway_evidence` is never dispatched.
+    ## Measured, this code **never ran once** from the day it was written: a bare data.frame came
+    ## back, the user saw the raw 20-column table, and none of the `reason` / `capped by` lines
+    ## printed. Another "looks written, never actually ran" example.
     class(out) <- c("pathway_evidence", "data.frame")
     out
 }
@@ -752,21 +804,21 @@ pathway_evidence <- function(x, drivers = NULL, signed = NULL, alpha = 0.05,
     attr(out, "dataset_lookup") <- data.frame(driver = drivers %||% character(0),
         status = rep("not-run", length(drivers %||% character(0))),
         message = rep("", length(drivers %||% character(0))), stringsAsFactors = FALSE)
-    ## 与正常返回保持同一 class。不设的话空结果不走 print.pathway_evidence，
-    ## 用户在同一函数上看到两种输出形态。
+    ## Same class as a normal return. Without it, an empty result skips print.pathway_evidence and
+    ## the user sees two output shapes from the same function.
     class(out) <- c("pathway_evidence", "data.frame")
     out
 }
 
-## 列子集后必须退回普通 data.frame。
+## A column subset must fall back to a plain data.frame.
 ##
-## `[.data.frame` 会把自定义 class 一起带过去，于是 `out[, c("pathway","level")]`
-## 仍然声称自己是 `pathway_evidence`，而 `print.pathway_evidence` 要读 `driver`、
-## `reason`、`support` 这些已经不在的列，`is.na(NULL)` 是 `logical(0)`，
-## `if` 收到长度 0 就报 "argument is of length zero"——一条指不出原因的错误。
+## `[.data.frame` carries the custom class along, so `out[, c("pathway","level")]` still claims to
+## be `pathway_evidence` while `print.pathway_evidence` reads `driver`, `reason` and `support`,
+## columns that are no longer there; `is.na(NULL)` is `logical(0)`, and `if` given length 0 fails
+## with "argument is of length zero" -- an error that names no cause.
 ##
-## 按列取子集是极常见的操作（本项目自己的脚本里就到处都是），所以把 class 的
-## 存续条件绑在"列还全"上，而不是让 print 去猜。
+## Column subsetting is extremely common (it is everywhere in this project's own scripts), so the
+## class's survival is tied to "the columns are all still there" rather than left to print to guess.
 #' @export
 `[.pathway_evidence` <- function(x, i, j, drop = TRUE) {
     needed <- c("pathway", "direction", "n_members", "support", "driver",
@@ -871,7 +923,7 @@ print.pathway_evidence <- function(x, n = 10L, ...) {
             row <- shown[i, ]
             driver <- if (!length(row$driver) || is.na(row$driver)) "-" else
                 sprintf("%s/%s padj %.2g", row$driver, row$cell_line, row$padj)
-            ## `%||%` 只接 NULL，接不住 NA；原来方向印成 "NA"、支撑率印成 "NA%"。
+            ## `%||%` only catches NULL, not NA; direction used to print as "NA" and support as "NA%".
             dir_txt <- if (is.na(row$direction)) "?" else row$direction
             sup_txt <- if (is.na(row$support)) "-" else sprintf("%.0f%%", 100 * row$support)
             ev <- evidence[i, ]
@@ -889,7 +941,8 @@ print.pathway_evidence <- function(x, n = 10L, ...) {
         }
     }
 
-    ## 陈述放在末尾而不是每行都印：它是要被检验的主张，不是摘要的一部分。
+    ## The statement goes at the end instead of printing on every row: it is a claim to be tested,
+    ## not part of the summary.
     a <- x[x$level == "A" & evidence$evidence_status == "support", , drop = FALSE]
     if (nrow(a)) {
         cat("\n  legacy claim to test (not causal identification):\n")
@@ -899,19 +952,21 @@ print.pathway_evidence <- function(x, n = 10L, ...) {
 }
 
 
-## 把通路结果里的成员 ID 统一到符号空间。
+## Bring the member IDs in a pathway result into symbol space.
 ##
-## 判定：取全部待报告通路的成员，若**全部**是纯数字，就认定是 Entrez 并翻译。
-## 只做这一种判定，因为 Entrez/RefSeq/Ensembl 之外没有常见的纯数字形态，
-## 而猜错的代价（静默全空）比不猜的代价（要求调用方自己转）大得多。
+## Detection: take the members of every pathway to be reported; if **all** of them are purely
+## numeric, treat them as Entrez and translate. Only this one test is made, because outside
+## Entrez/RefSeq/Ensembl there is no common purely numeric form, and guessing wrong (silently all
+## empty) costs far more than not guessing (asking the caller to convert).
 ##
-## 翻译失败时**原样返回**，让后面的守卫去报错——错误信息在那里更完整。
+## If translation fails, **return unchanged** and let the guard downstream report it -- the error
+## message is more complete there.
 .pathway_ids_to_symbols <- function(d, signed) {
     if (is.null(d) || !nrow(d) || !"geneID" %in% names(d)) return(d)
     toks <- unique(trimws(unlist(strsplit(as.character(d$geneID), "/"))))
     toks <- toks[nzchar(toks) & !is.na(toks)]
     if (!length(toks) || !all(grepl("^[0-9]+$", toks))) return(d)
-    ## 已经是数字、且 signed 也是数字时不用转，两者本来就同空间。
+    ## Already numeric, and `signed` numeric too: no conversion needed, they are in the same space.
     if (!is.null(signed) && length(signed) && all(grepl("^[0-9]+$", names(signed)))) return(d)
     if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) return(d)
 
@@ -929,20 +984,21 @@ print.pathway_evidence <- function(x, n = 10L, ...) {
 }
 
 
-## 当一组通路的低等级**全部**来自同一个外部缺口时，发一次 warning 说清楚。
+## When the low grades of a batch of pathways **all** come from one external gap, warn once and say
+## so plainly.
 ##
-## 只在"没有任何 A"时触发：如果已经有 A，说明条件部分满足，逐行看 `reason` 就够了，
-## 再报一次只是噪音。
+## Fires only when there is no A at all: if some rows already reached A the conditions are partly
+## met, reading `reason` row by row is enough, and one more message is just noise.
 .pathway_warn_capped <- function(out, drivers, failed = character(0)) {
-    ## `!any(level %in% c("A","B","C"))` 是恒假的：level 只有这三个取值。
-    ## 原来那句永远不会命中，等于没写。
+    ## `!any(level %in% c("A","B","C"))` is vacuously false: level only takes those three values.
+    ## That line could never fire, so it was as good as unwritten.
     if (!nrow(out)) return(invisible(NULL))
     if (any(out$level == "A", na.rm = TRUE)) return(invisible(NULL))
 
     why <- c("single-cell-line", "lookup-failed", "no-dataset", "too-small", "no-test-completed")
     rs <- out$reason[!is.na(out$reason) & out$reason %in% why]
     if (!length(rs) || length(unique(rs)) != 1L) return(invisible(NULL))
-    ## 要占多数才报——零星几条小通路不够格解释整批结果。
+    ## Only report on a majority -- a handful of small pathways cannot explain a whole batch.
     if (length(rs) < max(1L, floor(0.5 * nrow(out)))) return(invisible(NULL))
 
     ## Name the candidates the sentence is true of. After a partial lookup
@@ -973,15 +1029,16 @@ print.pathway_evidence <- function(x, n = 10L, ...) {
 }
 
 
-## 通路名字从哪来。
+## Where the pathway name comes from.
 ##
-## 文档允许两种输入：`enrichResult`（有 `Description` / `ID`）与 `evidence()` 的
-## `$pathways` 表（有 `pathway_description` / `pathway`）。只认前一套列名时，
-## 后一条入口的每一行都得到 `NA` —— 实测确实如此，而且不报错，只是表格里
-## 通路名一栏空着。
+## The documentation allows two inputs: an `enrichResult` (with `Description` / `ID`) and the
+## `$pathways` table from `evidence()` (with `pathway_description` / `pathway`). Recognising only the
+## first set of column names gave every row of the second entry point an `NA` -- measured, that is
+## exactly what happens, with no error, just an empty pathway-name column in the table.
 ##
-## 两种列名都试，都没有才回退到 `NA`。这不是猜：`evidence_pathway.R` 里写的就是
-## `pathway_description`，是同一个包内的**既定契约**。
+## Both sets of names are tried, and only when neither exists does it fall back to `NA`. This is not
+## a guess: `evidence_pathway.R` writes `pathway_description`, which is an **established contract**
+## within the same package.
 .pathway_label <- function(row, i = 1L) {
     for (nm in c("Description", "pathway_description", "ID", "pathway")) {
         if (!is.null(row[[nm]])) {

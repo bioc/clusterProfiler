@@ -1,8 +1,10 @@
-## 判决书层的离线测试。
+## Offline tests for the verdict sheet layer.
 ##
-## 这一层最容易出的错不是崩溃，而是**动作与原因不对应**：一条 concept 侧的失败
-## 被写成"再补一份数据"，用户就会去做一件不会改变结论的事。所以测试重点放在
-## "每个 reason 都有对应动作、且三侧不串"上，而不是只测能不能打印。
+## The most likely error here is not a crash but **an action that does not match its
+## reason**: when a concept-side failure is written up as "add one more dataset",
+## the user goes off and does something that cannot change the conclusion. So the
+## tests focus on "every reason has its action, and the three sides do not bleed
+## into each other", not merely on whether it can print.
 
 .make_pe <- function(level, verdict, reason, driver = NA_character_, pathway = "p") {
     data.frame(pathway = pathway, direction = "up", n_members = 20L, support = 0.8,
@@ -13,9 +15,10 @@
 }
 
 test_that("every reason pathway_evidence can emit has an action and a side", {
-    ## 穷举而不是抽样：`pathway_evidence()` 能产出的 reason 值，每一个都必须能在
-    ## 动作表里查到。查不到的会静默变成 NA 动作，读者看到一行"没有下一步"却不知道
-    ## 是没有还是漏了。
+    ## Exhaustive rather than sampled: every reason value `pathway_evidence()` can
+    ## emit must be findable in the action table. A miss silently becomes an NA
+    ## action, so the reader sees "no next step" and cannot tell whether none exists
+    ## or it was left out.
     reasons <- c("single-cell-line", "direction-conflict", "no-dataset", "too-small",
                  "not-significant", "member-derived", "no-members", "low-support",
                  "no-direction", "no-fold-changes", "no-test-completed", "lookup-failed",
@@ -28,7 +31,8 @@ test_that("every reason pathway_evidence can emit has an action and a side", {
         expect_false(is.na(hit$side))
         expect_false(is.na(hit$action))
     }
-    ## 等级 A 没有 reason，也要有一句下一步（在独立扰动里验证）。
+    ## Grade A has no reason, but it still needs a next step (verify by independent
+    ## perturbation).
     hit <- clusterProfiler:::.mechanism_remedy_for(NA_character_, "perturbation-supported")
     expect_false(is.na(hit$side))
 })
@@ -49,8 +53,9 @@ test_that("verdict classes split supported, conflicting and undetermined", {
 })
 
 test_that("a single cell line is reported as a gap, with the tissue when known", {
-    ## 库里只有 `NR3C1` 这一个写法；用户写 `GR`。别名必须能在两边对上，
-    ## 否则报告会对 `GR` 说"库里没有这个驱动者的数据"——一句假的事实陈述。
+    ## The inventory only has the `NR3C1` spelling; the user writes `GR`. Aliases
+    ## must resolve in both directions, otherwise the report tells `GR` "the
+    ## inventory has no data for this driver" - a false statement of fact.
     inv <- data.frame(perturbed_gene = "NR3C1", dataset_id = "D1",
                       cell_line = "HEK293T", tissue = "Kidney",
                       n_samples = 4, stringsAsFactors = FALSE)
@@ -121,15 +126,17 @@ test_that("print covers evidence sections and the inventory", {
 })
 
 test_that("a bare too-small verdict still gets an action", {
-    ## 键必须落在补救表里：原来写 "too-small-decomp"（全仓只此一处），
-    ## match 落空后那一行会静默没有下一步。
+    ## The key must land in the remedy table: it previously read "too-small-decomp"
+    ## (the only occurrence in the whole repo), and when match missed, that row
+    ## silently got no next step.
     hit <- clusterProfiler:::.mechanism_remedy_for(NA_character_, "too-small")
     expect_false(is.na(hit$side))
     expect_false(is.na(hit$action))
 })
 
 test_that("direction-conflict is not sold as a data gap", {
-    ## 它是证据反对（读作压制），不能承诺"再补一份数据就能救"。
+    ## It is evidence against (read as repression) and cannot promise that "one more
+    ## dataset will rescue it".
     hit <- clusterProfiler:::.mechanism_remedy_for("direction-conflict", "direction-conflict")
     expect_equal(hit$side, "concept")
     expect_false(isTRUE(hit$unlocks))
@@ -144,8 +151,8 @@ test_that("drivers whose target sets overlap are put in one module", {
     m <- clusterProfiler:::.mechanism_module_map(c("HIF1A","EPAS1","ATF4"), net, 0.10)
     expect_setequal(m$HIF1A, c("HIF1A","EPAS1"))
     expect_setequal(m$EPAS1, c("EPAS1","HIF1A"))
-    expect_equal(m$ATF4, "ATF4")          # 靶集不重叠，自己一组
-    ## 阈值调高就分开
+    expect_equal(m$ATF4, "ATF4")          # target sets do not overlap, so it is its own group
+    ## Raising the threshold separates them
     m2 <- clusterProfiler:::.mechanism_module_map(c("HIF1A","EPAS1","ATF4"), net, 0.9)
     expect_equal(m2$HIF1A, "HIF1A")
 })
@@ -180,7 +187,7 @@ test_that("a broad knockdown is flagged without changing the class", {
     r <- mechanism_report(x, inventory = inv, global_effect_de = 3000L)
     expect_match(r$verdicts$global_effect_reason[1], "global-effect")
     expect_true(is.na(r$verdicts$global_effect_reason[2]))
-    ## 判定档位不受影响
+    ## The verdict class is unaffected
     expect_equal(r$verdicts$class, c("undetermined","undetermined"))
     expect_true(any(grepl("global_effect_reason", r$summary)))
 })
@@ -203,8 +210,9 @@ test_that("module and global-effect never change the verdict class", {
 })
 
 test_that("modules and warnings are printed once each, not once per pathway", {
-    ## 同一件事按通路行重复：12 条通路会印 12 遍同一条警告；
-    ## `{ATF6, XBP1}` 与 `{XBP1, ATF6}` 是同一组，不能印两次。
+    ## The same fact repeated per pathway row: 12 pathways would print the same
+    ## warning 12 times; `{ATF6, XBP1}` and `{XBP1, ATF6}` are the same group and must
+    ## not be printed twice.
     x <- data.frame(pathway = paste0("p", 1:6), level = rep("B", 6),
                     verdict = rep("single-dataset", 6), reason = NA_character_,
                     driver = c("ATF6","XBP1","ATF6","XBP1","ATF6","XBP1"),
@@ -217,7 +225,7 @@ test_that("modules and warnings are printed once each, not once per pathway", {
                       cell_line = c("A","B"), tissue = c("T","T"),
                       dataset_id = c("d1","d2"), stringsAsFactors = FALSE)
     out <- capture.output(print(mechanism_report(x, inventory = inv, network = net)))
-    expect_equal(sum(grepl("^    \\{", out)), 1L)          # 只有一组
+    expect_equal(sum(grepl("^    \\{", out)), 1L)          # only one group
     expect_equal(sum(grepl("^    ATF6: available perturbations", out)), 1L)
 })
 

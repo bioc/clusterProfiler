@@ -650,7 +650,7 @@ test_that("a level C source never contributes to a supported verdict", {
 test_that("a missing MCP companion package aborts instead of reporting no evidence", {
     ## An empty table would read as "no perturbation moves these genes", which
     ## is a much stronger claim than "the source was not consulted".
-    skip_if_not_installed("gpsadb")
+    skip_if_no_gpsadb()
     expect_equal(nrow(mechanism_empty_perturbation()), 0)
     expect_named(mechanism_empty_perturbation(),
                  c("regulator", "source", "term", "named", "level",
@@ -740,6 +740,7 @@ test_that("all four collection sources are accepted together", {
 })
 
 test_that("a bundle with only measured evidence does not crash", {
+    skip_if_no_gpsadb()
     ## Perturbation evidence alone leaves no collection, so `sets` is empty and
     ## regulators has no rows; everything downstream must still work.
     dir <- tempfile("mechanism"); dir.create(dir)
@@ -1438,6 +1439,7 @@ test_that("collapse leaves findings that say different things alone", {
 })
 
 test_that("collapse reports a zero-row frame when there is nothing to collapse", {
+    skip_if_no_gpsadb()
     dir <- tempfile("mechanism"); dir.create(dir)
     old <- options(clusterProfiler_cache_dir = dir)
     withr::defer(options(old))
@@ -1453,6 +1455,7 @@ test_that("collapse reports a zero-row frame when there is nothing to collapse",
 
 test_that("collapse validates its arguments", {
     expect_error(collapse_findings("x"), "evidenceBundle")
+    skip_if_no_gpsadb()
     dir <- tempfile("mechanism"); dir.create(dir)
     old <- options(clusterProfiler_cache_dir = dir)
     withr::defer(options(old))
@@ -1632,7 +1635,7 @@ test_that("the bundle carries failures where print() can show them", {
 test_that("a biotrigger hit is graded B, not C", {
     ## It is a measurement (the factor was perturbed), but the evidence is the
     ## overlap of two signatures, which is weaker than a direct assay.
-    skip_if_not_installed("gpsadb")
+    skip_if_no_gpsadb()
     e <- mechanism_empty_biotrigger()
     expect_true(all(c("regulator", "level", "evidence_kind") %in% names(e)))
     expect_equal(nrow(e), 0)
@@ -1697,6 +1700,7 @@ test_that("a mechanism graph draws no absent entity", {
 
 test_that("a graph with nothing to draw refuses rather than plotting nothing", {
     skip_if_not_installed("mechgraph")
+    skip_if_no_gpsadb()
     dir <- tempfile("mechanism"); dir.create(dir)
     old <- options(clusterProfiler_cache_dir = dir)
     withr::defer(options(old))

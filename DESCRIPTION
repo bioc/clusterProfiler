@@ -1,7 +1,7 @@
 Package: clusterProfiler
 Type: Package
 Title: A Universal Enrichment Tool for Interpreting Omics Data
-Version: 4.21.6
+Version: 4.21.7
 Authors@R: c(
     person(given = "Guangchuang", family = "Yu",        email = "guangchuangyu@gmail.com",   role  = c("aut", "cre", "cph"), comment = c(ORCID = "0000-0002-6485-8781")),
     person(given = "Li-Gen",      family = "Wang",      email = "reeganwang020@gmail.com",   role  = "ctb"),
@@ -44,7 +44,6 @@ Imports:
     utils,
     yulab.utils (>= 0.2.3)
 Suggests:
-    aisdk.mcp,
     AnnotationHub,
     ape,
     BiocManager,
@@ -52,7 +51,6 @@ Suggests:
     DOSE,
     ggtangle,
     ggtree,
-    gpsadb,
     mechgraph,
     org.Hs.eg.db,
     quarto,
@@ -60,6 +58,12 @@ Suggests:
     testthat,
     treeio,
     withr
+Enhances:
+    aisdk.mcp,
+    gpsadb
+Remotes:
+    YuLab-SMU/aisdk.mcp,
+    YuLab-SMU/gpsadb
 VignetteBuilder: quarto
 ByteCompile: true
 License: Artistic-2.0

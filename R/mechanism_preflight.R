@@ -1,26 +1,29 @@
-## 预检门：在跑任何归属之前，先判断这份数据支不支持归属。
+## Preflight gate: before any attribution runs, decide whether this data can support one.
 ##
-## 为什么要有这一层。十一个数据集里五个失败，而失败原因**在跑之前就能看出来**：
-## 两个数据集 GO 一条都没有、一个只有 23 个上调基因、一个驱动者在库里只有一份
-## 数据集。原来的做法是照跑一遍，然后输出一排 `C unsupported` ——读者分不清
-## "没找到"与"没法找"。
+## Why this layer exists. Five of eleven datasets failed, and the reasons were **visible before
+## running**: two datasets held no GO term at all, one held only 23 up-regulated genes, one driver
+## had a single dataset in the inventory. The old approach ran anyway and printed a row of
+## `C unsupported` -- the reader could not tell "not found" from "could not be looked for".
 ##
-## 判据来自 `pathway-mechanism-design.md` §7.9 已经记录的适用边界（差异基因要够多、
-## 通路成员要够、驱动者要有 ≥2 个细胞系），**不是**从这次对比的结果反推的。
-## 但那也意味着：§7.9 只给了定性说法（"23 明显不够、351 明显够"），下面这三个
-## 阈值是**在两个已知点之间取的数，没有测过**。所以门输出的是**档位 + 依据的数字**，
-## 而不是一个"合格"的判决；调用方可以按自己的数据调阈值。
+## The criteria come from the applicability boundary already recorded in
+## `pathway-mechanism-design.md` Section 7.9 (enough differential genes, enough pathway members, a driver
+## with >=2 cell lines), **not** from back-inferring the results of this comparison.
+## That also means Section 7.9 gave only qualitative statements ("23 is clearly too few, 351 clearly
+## enough"), so the three thresholds below are **numbers taken between two known points, never
+## measured**. The gate therefore reports a **tier plus the numbers behind it**, not a pass/fail
+## verdict; a caller can move the thresholds for its own data.
 
-## 上调基因数：用 log2FC > 1 计数。
+## Up-regulated gene count: counted with log2FC > 1.
 ##
-## 严格的写法要 padj < 0.05 且 |log2FC| >= 1，但那需要调用方传 padj，而这一层
-## 拿到的只有 `signed`。用 log2FC > 1 会把边界放宽一点（缺氧：351 严格 → 约 400），
-## 对"够不够"这个判断没有影响，但要在文档里说清不是同一个数。
+## The strict definition needs padj < 0.05 and |log2FC| >= 1, but that requires the caller to pass
+## padj, and this layer only receives `signed`. Using log2FC > 1 loosens the boundary a little
+## (hypoxia: 351 strict -> about 400), which does not affect the "enough or not" judgement, but the
+## documentation has to say clearly that it is not the same number.
 .mechanism_preflight_counts <- function(x, signed) {
     d <- if (is.data.frame(x)) x else as.data.frame(x)
-    ## 优先用富集分析**真正吃进去**的那批基因（`enrichResult` 的 `@gene`）。
-    ## 退回 `signed > 1` 会把数目放大好几倍（缺氧：严格 351，退回口径 881），
-    ## 于是"上调基因太少"这条判据几乎永不触发。
+    ## Prefer the genes the enrichment analysis **actually consumed** (`enrichResult`'s `@gene`).
+    ## Falling back to `signed > 1` inflates the count several-fold (hypoxia: 351 strict, 881 on the
+    ## fallback), so the "too few up-regulated genes" criterion would almost never fire.
     n_up <- if (inherits(x, "enrichResult") && length(methods::slot(x, "gene"))) {
         length(methods::slot(x, "gene"))
     } else if (!is.null(signed) && length(signed)) {
@@ -78,18 +81,20 @@ mechanism_preflight <- function(x, signed = NULL, reference = NULL, drivers = NU
             cnt, NA_real_, NA_integer_, NA_integer_))
     }
 
-    ## 通路大小按**通路自身**算，不按"覆盖成员数"。
+    ## Pathway size is the **pathway's own** size, not its covered member count.
     ##
-    ## 第一版用的是覆盖成员数、阈值 8，结果把三个成功的数据集也挡了（它们的通路
-    ## 中位覆盖只有 5–7）。那个 8 是从 §7.9 抄来的，而 §7.9 的"成员数要 12 以上"
-    ## 说的是 `test_gene_set` 算不出 p 值——**那是旧统计量的边界，不是这条的**。
-    ## 形状相关在 5 个成员的通路上照样能算。把旧边界搬到新统计量上，是类别错误。
+    ## The first version used covered members with a threshold of 8, and that blocked three
+    ## successful datasets too (their median coverage was only 5-7). The 8 was copied from Section 7.9,
+    ## where "12 or more members" means `test_gene_set` cannot produce a p-value -- **that is a
+    ## boundary of the old statistic, not of this one**. A shape correlation is still computable on
+    ## a 5-member pathway. Carrying an old boundary over to a new statistic is a category error.
     sz <- vapply(seq_len(nrow(cnt$d)), function(i) length(.pathway_members(cnt$d[i, ])), 0L)
     med_members <- stats::median(sz, na.rm = TRUE)
 
     n_cell_lines <- NA_integer_
-    ## 显式初始化：`exists()` 会继承父环境，全局里恰好有个同名变量就会污染输出。
-    ## 用真实的状态（NA = 没算过）做控制流，不用"变量是否存在"。
+    ## Initialise explicitly: `exists()` inherits from parent environments, so a same-named global
+    ## would pollute the output. Control flow uses the real state (NA = not computed yet), not
+    ## whether a variable exists.
     n_cell_lines_min <- NA_integer_
     per <- vapply(drivers, function(g) {
         supplied <- inherits(reference, "mechanismReference")

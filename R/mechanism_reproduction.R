@@ -1,17 +1,21 @@
-## 复现率：一条单细胞系的 B 级结论，到底有没有第二份数据撑住？
+## Reproduction rate: does a single-cell-line level-B conclusion have a second dataset behind it?
 ##
-## 为什么要这一层。11 个已知真值的数据集里，停在 B 级（`single-cell-line`）的两行
-## ——airway 与 GSE286890 的 GR——**都指向正确的驱动者**。所以 B 不等于错，B 是
-## "证据只有一份"。但"只有一份"与"多份都指向同一方向"在读法上完全不同，而原来的
-## 输出对两者用同一句措辞。
+## Why this layer. Among the 11 datasets with known ground truth, the two rows that stopped at
+## level B (`single-cell-line`) -- GR in airway and in GSE286890 -- **both point at the correct
+## driver**. So B does not mean wrong, B means "there is only one piece of evidence". But "only
+## one" and "several point the same way" read completely differently, and the old output used one
+## sentence for both.
 ##
-## 判据来自 `mechanism-benchmark-spec.md` §4：**一致性**（concordance），不是
-## "与通路方向一致"。后者是符号错误——激活型驱动者被敲低时，通路应当**下调**，
-## 与通路方向**相反**。那会把真驱动者算成 0 复现，而且越真的越接近 0
-## （实测 HIF1A × 缺氧通路：旧口径 0.00，新口径 1.00，majority_sign = −1）。
+## The criterion comes from `mechanism-benchmark-spec.md` Section 4: **concordance**, not
+## "agrees with the pathway direction". The latter is a sign error -- an activating driver that is
+## knocked down
+## should push the pathway **down**, the **opposite** of the pathway direction. That scores a true
+## driver as 0 reproduction, and the truer the driver the closer to 0 (measured, HIF1A x hypoxia
+## pathway: old criterion 0.00, new criterion 1.00, majority_sign = -1).
 ##
-## 方向判定不经过 `pathway_evidence()` 自己的 es：直接用扰动谱的成员均值符号，
-## 否则是拿同一统计量校准自己的措辞（第一期 §7.10 记过一次自引用）。
+## Direction is decided without `pathway_evidence()`'s own es: the sign of the members' mean shift
+## in the perturbation profile is used directly, otherwise the same statistic would calibrate its
+## own wording (phase one Section 7.10 recorded one case of self-reference).
 
 #' Concordance of a pathway shift across independent perturbation datasets
 #'
@@ -83,10 +87,10 @@ mechanism_reproduction <- function(profiles, meta, pathways, drivers = NULL,
     if (anyDuplicated(meta$dataset))
         stop("`meta` has inconsistent duplicate dataset identities.", call. = FALSE)
     meta <- meta[meta$dataset %in% colnames(profiles), , drop = FALSE]
-    ## 敲低强度过滤。放在取子集之前，否则 k 会把弱敲低的实验算进去——
-    ## 实测 12 个驱动者里有 3 个（ARNT / ESR1 / NR3C1）全部实验都弱于 −1，
-    ## 不过滤时它们各得 4 / 6 / 1 份，过滤后归零。这个差别必须由调用方看见，
-    ## 所以 max_log2fc 是参数而不是硬编码。
+    ## Knockdown-strength filter. Kept before the subsetting, otherwise `k` would count weak
+    ## knockdowns -- measured, 3 of 12 drivers (ARNT / ESR1 / NR3C1) have every experiment weaker
+    ## than -1, scoring 4 / 6 / 1 datasets unfiltered and zero filtered. The caller has to see that
+    ## difference, so `max_log2fc` is a parameter rather than hard-coded.
     if (!is.null(max_log2fc) && "logFC" %in% names(meta)) {
         keep <- !is.na(meta$logFC) & meta$logFC <= max_log2fc
         meta <- meta[keep, , drop = FALSE]
@@ -121,9 +125,9 @@ mechanism_reproduction <- function(profiles, meta, pathways, drivers = NULL,
                     stringsAsFactors = FALSE)
                 next
             }
-            ## 多数派 = **符号的众数**，不是 sum(shift) 的符号。
-            ## 后者在效应量不均时会翻：shift = c(-0.1, -0.1, +5) 有 2/3 为负，
-            ## sum 却为正，于是把"多数同向"判成 not-reproduced。
+            ## Majority = **the mode of the signs**, not the sign of sum(shift).
+            ## The latter flips when effect sizes are uneven: shift = c(-0.1, -0.1, +5) is 2/3
+            ## negative, yet the sum is positive, so "mostly the same way" becomes not-reproduced.
             s <- sign(shift)
             npos <- sum(s > 0); nneg <- sum(s < 0)
             maj <- if (npos == nneg) NA_integer_

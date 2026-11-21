@@ -1,17 +1,21 @@
-## 发现门：从一条差异表达谱，排出"可能驱动它的转录因子"。
+## Discovery gate: from one differential expression profile, shortlist the transcription factors
+## that could have driven it.
 ##
-## 为什么要有这一层。核验层（`pathway_evidence()`）回答的是"给定一个候选，证据够不够"，
-## 它按设计不能回答"是谁"——每份数据要 265 个候选全测一遍才能识别，按每次 GPSAdb
-## 调用 1–2 秒算是 30–50 分钟一份。所以要有一个便宜的第一道：先排出候选，再逐个核验。
+## Why this layer. The verification layer (`pathway_evidence()`) answers "given a candidate, is the
+## evidence enough"; by design it cannot answer "who", because identifying the driver means testing
+## all 265 candidates on every dataset, and at 1-2 seconds per GPSAdb call that is 30-50 minutes per
+## profile. So there has to be a cheap first pass: shortlist candidates, then verify each one.
 ##
-## 方法不是我们发明的，是 `ulm`（decoupler）：把某个 TF 的靶基因权重向量（靶 = ±1，
-## 非靶 = 0）与整条 log2FC 谱求 Pearson 相关，再用样本量换成 t 值。
-## 我们试过 12 个组合（集成、跨网络、viper、按绝对值排序），没有一个超过它。
+## The method is not ours, it is `ulm` (decoupler): take one TF's target weight vector (target = +/-1,
+## non-target = 0), correlate it with the whole log2FC profile by Pearson, then turn the sample size
+## into a t-value. We tried 12 combinations (ensemble, cross-network, viper, ranking by absolute
+## value) and none beat it.
 ##
 ## Full-universe benchmark and frozen inputs: dev_docs/mechanism-benchmark-4215.R.
 ## A missing top-20 rank is a ranking miss, not evidence of network absence.
 ##
-## 所以这里不"改进"它，只做三件它没有的事：**去自环、给方向、说清覆盖多少**。
+## So nothing here "improves" it; it only does the three things `ulm` does not: **drop self-loops,
+## give a direction, disclose how much is covered**.
 
 #' Rank candidate transcription factors for a differential expression profile
 #'
@@ -90,8 +94,9 @@ mechanism_discover <- function(signed, network, top = 10L, min_targets = 5L,
     if (!is.numeric(signed) || is.null(names(signed)))
         stop("`signed` must be a named numeric vector (gene symbol to log2 fold change).",
              call. = FALSE)
-    ## 重复基因名会让 `w[match()]`（只填第一个位置）与 `x`（每个重复位置都有值）
-    ## 错位，相关分数静默给错。同包的 `finish()` 早就按 |lfc| 最大去重，这里照做。
+    ## Duplicated gene names misalign `w[match()]` (which fills only the first position) with `x`
+    ## (which has a value at every duplicate position), so the correlation score is silently wrong.
+    ## The package's `finish()` already deduplicates by largest |lfc|; do the same here.
     if (anyDuplicated(names(signed))) {
         n_dup <- sum(duplicated(names(signed)))
         ord <- order(-abs(signed))
@@ -109,8 +114,9 @@ mechanism_discover <- function(signed, network, top = 10L, min_targets = 5L,
     net <- net[!is.na(net$source) & !is.na(net$target) & is.finite(net$weight), ,
                drop = FALSE]
 
-    ## 自环：靶基因里含 TF 自己。不删的话，敲低/敲除实验里 TF 自身的 log2FC
-    ## 会直接把它的分数顶上去（CollecTRI 里 62% 的 TF 带这种边）。
+    ## Self-loops: the TF listed among its own targets. Left in, the TF's own log2FC in a
+    ## knockdown/knockout experiment would push its score up directly (62% of TFs in CollecTRI
+    ## carry such an edge).
     if (!keep_self_targets) {
         self <- net$source == net$target
         if (any(self)) {
@@ -122,8 +128,9 @@ mechanism_discover <- function(signed, network, top = 10L, min_targets = 5L,
     if (!nrow(net))
         stop("No usable edges left in `network`.", call. = FALSE)
 
-    ## NA 的处理：`signed` 里可能有没算出来的基因。留着会让整列相关变成 NA，
-    ## 而"这条基因没测出 fold change"与"它没变化"是两件事，所以直接剔除并说明。
+    ## Handling NA: `signed` may hold genes whose value could not be computed. Keeping them turns
+    ## the whole correlation into NA, and "this gene has no measured fold change" is not "it did not
+    ## change", so drop them and say so.
     if (any(!is.finite(signed))) {
         n_na <- sum(!is.finite(signed))
         message(sprintf("Dropped %d gene(s) with non-finite log2 fold change.", n_na))
@@ -140,13 +147,16 @@ mechanism_discover <- function(signed, network, top = 10L, min_targets = 5L,
     if (!nrow(net))
         stop("None of the network targets are measured in `signed`.", call. = FALSE)
 
-    ## 所有 TF 用**同一批基因**算相关，df 才是常数。
+    ## Every TF is correlated over **the same set of genes**, so df stays constant.
     ##
-    ## 基因域取**整条测量谱**，不是只取网络靶基因。两个理由：
-    ##   1. 统计上要的是"这组靶基因相对全转录组特殊吗"，只取靶基因就没有对照组了
-    ##      （单 TF 网络里 w 全是 1，方差为 0，函数会直接拒绝）；
-    ##   2. 网络总是残缺的，没被任何 TF 收录的基因仍是背景的一部分。
-    ## 网络覆盖广时（CollecTRI 约 4600 个靶），这与 decoupler 在 adj 特征上算的结果一致。
+    ## The gene universe is **the whole measured profile**, not just the network's targets. Two
+    ## reasons:
+    ##   1. Statistically the question is "are these target genes special relative to the whole
+    ##      transcriptome"; targets alone leave no contrast (in a single-TF network w is all 1, the
+    ##      variance is 0, and the function refuses outright);
+    ##   2. A network is always incomplete, and genes no TF lists are still part of the background.
+    ## With broad network coverage (CollecTRI, about 4600 targets) this matches what decoupler
+    ## computes on the adj feature.
     genes <- names(signed)
     x <- as.numeric(signed[genes])
     xc <- x - mean(x)
@@ -177,8 +187,8 @@ mechanism_discover <- function(signed, network, top = 10L, min_targets = 5L,
     if (is.null(out) || !nrow(out))
         stop("No factor had enough measured targets. Lower `min_targets` or widen the network.",
              call. = FALSE)
-    ## 实际参与评分的因子数，不是网络里有边的因子数。后者会把因 `min_targets`
-    ## 被跳过的也算进去，用户看到 "tested 1176" 会以为全都评了。
+    ## The number of factors actually scored, not the number with edges in the network. The latter
+    ## also counts those skipped by `min_targets`, so "tested 1176" looks like all were scored.
     n_scored <- sum(!vapply(rows, is.null, logical(1)))
     out <- out[order(if (rank_by == "abs") -abs(out$score) else -out$score), ,
                drop = FALSE]
@@ -187,7 +197,8 @@ mechanism_discover <- function(signed, network, top = 10L, min_targets = 5L,
     out <- out[, c("rank", "source", "score", "r", "direction", "n_targets",
                    "share"), drop = FALSE]
     rownames(out) <- NULL
-    ## 属性在取子集之后设置：`[.data.frame` 会丢掉它们，放在前面就白设了。
+    ## Attributes are set after subsetting: `[.data.frame` drops them, so setting them earlier
+    ## would be wasted.
     attr(out, "n_genes") <- length(genes)
     attr(out, "n_factors_tested") <- n_scored
     attr(out, "n_factors_in_network") <- length(split_idx)

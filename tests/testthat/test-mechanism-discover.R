@@ -1,6 +1,6 @@
-## 发现门（mechanism_discover）的判定与守卫。
+## Decision rules and guards for the discovery gate (mechanism_discover).
 ##
-## 这一层不联网、不依赖外部表，所以全部可测。
+## This layer touches no network and no external table, so all of it is testable.
 
 .make_net <- function(df) data.frame(source = df[[1]], target = df[[2]],
                                      weight = df[[3]], stringsAsFactors = FALSE)
@@ -8,8 +8,9 @@
 test_that("a factor whose targets moved ranks first", {
     genes <- paste0("g", 1:40)
     signed <- stats::setNames(c(rep(1.2, 6), rep(0, 34)), genes)
-    ## 显式写 data.frame：`.make_net(list(...))` 会因为向量长度不等而被回收，
-    ## 把两个 TF 的靶基因交错成同一批（测试第一版就是这么错的）。
+    ## Spell out data.frame: `.make_net(list(...))` recycles on unequal vector
+    ## lengths and interleaves the two TFs' targets into one set (the first version
+    ## of this test failed exactly that way).
     net <- data.frame(source = rep(c("TF1", "TF2"), each = 6),
                       target = c(genes[1:6], genes[7:12]), weight = 1,
                       stringsAsFactors = FALSE)
@@ -20,18 +21,21 @@ test_that("a factor whose targets moved ranks first", {
 })
 
 test_that("self-targets are dropped, and that is what keeps knockouts honest", {
-    ## 敲除实验里 TF 自己的 log2FC 最强；自环会把它的分数顶到第一。
-    ## 这不是理论问题：CollecTRI 里 62% 的 TF 带自环，删掉值 5 个点。
+    ## In a knockout experiment the TF's own log2FC is the strongest; a self-loop
+    ## pushes its score to the top. This is not theoretical: 62% of the TFs in
+    ## CollecTRI carry a self-loop, and removing them is worth 5 points.
     genes <- paste0("g", 1:40)
     signed <- stats::setNames(c(-3, rep(1.2, 6), rep(0, 33)), genes)
-    ## 自环在真实数据里是"TF 把自己列为靶"——所以 TF 名必须就是基因名之一。
-    ## g1 是 TF1，它的靶 = 自己(g1) + g2..g7；TF2 的靶 = g2..g7。
+    ## In real data a self-loop is "the TF lists itself as a target" - so the TF name
+    ## must be one of the gene names. g1 is TF1: its targets = itself (g1) + g2..g7;
+    ## TF2's targets = g2..g7.
     net <- data.frame(
         source = c("g1", rep("g1", 6), rep("g2", 6)),
         target = c("g1", genes[2:7], genes[2:7]),
         weight = 1, stringsAsFactors = FALSE)
     expect_message(out <- mechanism_discover(signed, net, top = 2), "self-target")
-    ## 去掉自环后 TF1 与 TF2 靶集相同、分数并列；关键是 TF1 不再靠自身 log2FC 领先
+    ## With self-loops removed TF1 and TF2 have identical target sets and tied
+    ## scores; the point is that TF1 no longer leads on its own log2FC
     expect_equal(out$n_targets[out$source == "g1"], 6L)
     keep <- suppressMessages(mechanism_discover(signed, net, top = 2, keep_self_targets = TRUE))
     expect_equal(keep$n_targets[keep$source == "g1"], 7L)
@@ -39,7 +43,8 @@ test_that("self-targets are dropped, and that is what keeps knockouts honest", {
 
 test_that("weights carry the direction of regulation", {
     genes <- paste0("g", 1:40)
-    ## 靶基因整体下调，但权重是"抑制靶"（-1）→ 该因子应当判为激活
+    ## The targets go down overall, but the weights say "represses target" (-1)
+    ## -> the factor should be called activating
     signed <- stats::setNames(c(rep(-1.2, 6), rep(0, 34)), genes)
     net <- .make_net(list("TF1", genes[1:6], rep(-1, 6)))
     out <- mechanism_discover(signed, net, top = 1)
@@ -59,9 +64,11 @@ test_that("factors with too few measured targets are skipped", {
 })
 
 test_that("targets outside the measured genes are dropped, not zero-filled", {
-    ## 零填会把"没测到"当成"没变化"，分数被稀释。必须按测到的交集算。
+    ## Zero-filling treats "not measured" as "unchanged" and dilutes the score.
+    ## It must be computed on the measured intersection.
     genes <- paste0("g", 1:40)
-    ## 只有 5 个基因被网络覆盖，所以它们之间必须有差异，否则方差为 0（这是正确的守卫）
+    ## Only 5 genes are covered by the network, so they must differ among themselves,
+    ## otherwise the variance is 0 (this guard is correct)
     signed <- stats::setNames(c(1, 1.1, 0.9, 1.05, 0.95, rep(0, 35)), genes)
     net <- data.frame(source = "TF1",
                       target = c(genes[1:5], "not_measured_1", "not_measured_2"),
@@ -108,7 +115,7 @@ test_that("share uses the whole measured vector and tested counts are honest", {
                       target = c(genes[1:6], genes[7:12], genes[13:14]),
                       weight = 1, stringsAsFactors = FALSE)
     out <- mechanism_discover(signed, net, top = 5, min_targets = 5)
-    ## TF3 只有 2 个靶基因，被 min_targets 跳过：tested 应是 2 而不是 3
+    ## TF3 has only 2 target genes and is skipped by min_targets: tested should be 2, not 3
     expect_equal(attr(out, "n_factors_tested"), 2L)
     expect_equal(attr(out, "n_factors_in_network"), 3L)
     expect_equal(attr(out, "n_genes"), 40L)

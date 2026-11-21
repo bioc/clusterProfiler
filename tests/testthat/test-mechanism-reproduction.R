@@ -1,14 +1,17 @@
-## 复现率（mechanism_reproduction）与它在 pathway_evidence 里的用法。
+## Reproduction rate (mechanism_reproduction) and its use inside pathway_evidence.
 ##
-## 这一层的测试只关心**判定规则**，不碰网络：输入是构造好的矩阵，
-## 输出是可预期的分级。真实数据的复现率由 `scripts/` 里的离线脚本算。
+## The tests at this layer care only about the **decision rules** and touch no
+## network: the input is a constructed matrix and the output a predictable grade.
+## The reproduction rate of real data is computed by the offline scripts in `scripts/`.
 
 test_that("concordance is measured against the majority, not against the pathway", {
-    ## 激活型驱动者被敲低 → 成员应当**下调**。若拿"与通路方向一致"当判据，
-    ## 真驱动者会得到 0 复现（实跑 HIF1A：旧口径 0.00、新口径 1.00）。
+    ## An activating driver that is knocked down -> members should be
+    ## **down-regulated**. Judging by "agrees with the pathway direction" gives a
+    ## true driver a reproduction of 0 (HIF1A in practice: 0.00 under the old rule,
+    ## 1.00 under the new one).
     profiles <- matrix(0, nrow = 6, ncol = 3,
                        dimnames = list(paste0("g", 1:6), c("d1", "d2", "d3")))
-    profiles[1:4, ] <- -1        # 四分之三的成员下调，三份数据一致
+    profiles[1:4, ] <- -1        # three quarters of the members go down, all three datasets agree
     meta <- data.frame(dataset = c("d1", "d2", "d3"), driver = "TF1",
                        biosample = c("A", "B", "C"))
     out <- mechanism_reproduction(profiles, meta, list(pw = paste0("g", 1:4)))
@@ -18,8 +21,9 @@ test_that("concordance is measured against the majority, not against the pathway
 })
 
 test_that("a single dataset is not-computable rather than perfectly concordant", {
-    ## k = 1 时一致性恒为 1。若不特判，"只有一份数据"会被算成"完美复现"，
-    ## 恰好把最该保守的情形说成最强的结论。
+    ## At k = 1 concordance is vacuously 1. Without a special case, "only one
+    ## dataset" is scored as "perfect reproduction", which turns the case that most
+    ## needs caution into the strongest conclusion.
     profiles <- matrix(-1, nrow = 4, ncol = 1,
                        dimnames = list(paste0("g", 1:4), "d1"))
     meta <- data.frame(dataset = "d1", driver = "TF1", biosample = "A")
@@ -35,14 +39,16 @@ test_that("runs that disagree are graded not-reproduced", {
     meta <- data.frame(dataset = c("d1", "d2", "d3"), driver = "TF1",
                        biosample = c("A", "B", "C"))
     out <- mechanism_reproduction(profiles, meta, list(pw = c("g1", "g2", "g3")))
-    ## 成员均值：d1 = -1, d2 = +1/3, d3 = +1/3 → 多数派为正，一致性 2/3
+    ## Member means: d1 = -1, d2 = +1/3, d3 = +1/3 -> the majority is positive,
+    ## concordance 2/3
     expect_equal(out$concordance, 2 / 3)
     expect_equal(out$grade, "consistent")
 })
 
 test_that("max_log2fc drops weak knockdowns before counting datasets", {
-    ## 实测：ARNT / ESR1 / NR3C1 在 KnockTF 里的全部实验都弱于 -1，
-    ## 不过滤时各得 4 / 6 / 1 份，过滤后归零。这个差别必须能被调用方看见。
+    ## Measured: every ARNT / ESR1 / NR3C1 experiment in KnockTF is weaker than -1;
+    ## unfiltered they get 4 / 6 / 1 datasets, filtered they drop to zero. The caller
+    ## must be able to see this difference.
     profiles <- matrix(-1, nrow = 4, ncol = 3,
                        dimnames = list(paste0("g", 1:4), c("d1", "d2", "d3")))
     meta <- data.frame(dataset = c("d1", "d2", "d3"), driver = "TF1",
@@ -61,13 +67,14 @@ test_that("reproduces needs three datasets from at least two biosamples", {
                        biosample = c("A", "A", "A"))
     out <- mechanism_reproduction(profiles, meta, list(pw = paste0("g", 1:4)))
     expect_equal(out$concordance, 1)
-    ## 三份同细胞系不算独立复现
+    ## Three datasets from one cell line are not independent reproduction
     expect_equal(out$grade, "consistent")
 })
 
 test_that("the level-B wording has three distinguishable branches", {
-    ## 不联网：直接测措辞辅助函数。三个分支必须彼此可区分——
-    ## 若"无第二份数据"与"不复现"共用一句，读者就分不清"没人验过"与"验过但失败了"。
+    ## No network: the wording helper is tested directly. The three branches must be
+    ## distinguishable - if "no second dataset" and "not reproduced" shared one
+    ## sentence, readers could not tell "nobody checked" from "checked and failed".
     base <- data.frame(driver = "TF1", pathway = "pw", k = 2L, n_biosamples = 2L,
                        n_genes = 3L, concordance = 1, majority_sign = -1L,
                        grade = "reproduces", stringsAsFactors = FALSE)
@@ -86,7 +93,7 @@ test_that("the level-B wording has three distinguishable branches", {
     st_nocov <- .pe_single_line_statement("TF1", 3L, "D1", 0.01, nocov)
     expect_match(st_nocov, "No independent reproduction is available", fixed = TRUE)
 
-    ## 没有 reproduction 表时退回原措辞
+    ## Without a reproduction table, fall back to the original wording
     st_none <- .pe_single_line_statement("TF1", 3L, "D1", 0.01, NULL)
     expect_match(st_none, "limit of the available data", fixed = TRUE)
 
@@ -95,9 +102,9 @@ test_that("the level-B wording has three distinguishable branches", {
 })
 
 test_that("the majority sign is the mode of signs, not the sign of the sum", {
-    ## 一份效应量特别大的数据不能翻掉两份较小但同向的。
-    ## 旧实现用 sign(sum(shift))：sum(c(-0.1,-0.1,+5)) > 0，于是把
-    ## "2/3 同向"判成 not-reproduced。
+    ## One dataset with a very large effect size must not overturn two smaller but
+    ## agreeing ones. The old implementation used sign(sum(shift)):
+    ## sum(c(-0.1,-0.1,+5)) > 0, so "2/3 agree" was graded not-reproduced.
     prof <- matrix(0, nrow = 3, ncol = 3,
                    dimnames = list(c("g1", "g2", "g3"), c("d1", "d2", "d3")))
     prof[1, ] <- c(-0.1, -0.1, 5)
@@ -119,7 +126,7 @@ test_that("datasets with no measured members do not inflate k", {
     out <- mechanism_reproduction(prof, meta, list(pw = c("g1", "g2", "g3")))
     expect_equal(out$k, 2L)
     expect_equal(out$n_biosamples, 2L)
-    expect_equal(out$grade, "consistent")   # k < 3，不能判 reproduces
+    expect_equal(out$grade, "consistent")   # k < 3, so reproduces cannot be assigned
 })
 
 test_that("finite member floors apply separately to every dataset", {
@@ -167,8 +174,9 @@ test_that("dataset identities cannot inflate reproduction counts", {
 })
 
 test_that("reproduction rows are matched through driver aliases", {
-    ## GPSAdb 返回 NR3C1，用户的表可能用别名 GR 建成。不解析会静默退回默认措辞，
-    ## 而这恰好是 P4 里两个 B 级案例（airway / GSE286890）的驱动者。
+    ## GPSAdb returns NR3C1, but a user's table may use the alias GR. Without alias
+    ## resolution the default wording silently comes back, and this is exactly the
+    ## driver in two grade-B cases in P4 (airway / GSE286890).
     rep <- data.frame(driver = "GR", pathway = "pw", k = 3L,
                       n_biosamples = 3L, n_genes = 5L, concordance = 1,
                       majority_sign = -1L, grade = "reproduces",
@@ -177,7 +185,7 @@ test_that("reproduction rows are matched through driver aliases", {
     expect_equal(nrow(hit), 1L)
     st <- .pe_single_line_statement("NR3C1", 5L, "D1", 0.01, hit)
     expect_match(st, "reproduces across 3 independent datasets", fixed = TRUE)
-    ## 反方向也要通
+    ## The reverse direction must work too
     rep2 <- rep; rep2$driver <- "NR3C1"
     expect_equal(nrow(.pe_reproduction_row("GR", "pw", rep2)), 1L)
     expect_error(.pe_reproduction_row("NR3C1", "pw", data.frame(x = 1)),

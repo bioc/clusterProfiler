@@ -1,11 +1,13 @@
-## 预检门的测试。
+## Tests for the preflight gate.
 ##
-## 重点不是"能不能打印"，而是**每一个挡人的理由都对应一个可复现的输入**，
-## 以及**不该挡的时候不挡**——一个总说"不行"的门和没有门一样没用。
+## The point is not whether it prints, but that **every reason that blocks has
+## a reproducible input behind it**, and that **it does not block when it should
+## not** - a gate that always says "no" is as useless as no gate at all.
 
 .make_preflight_ref <- function(n_cell = 2L, n_prog = 20L) {
-    ## 每个基因两份数据集（两份不同细胞系），这样"驱动者有 ≥2 个细胞系"这条
-    ## 在健康输入上成立；n_cell = 1 时把两份都放到同一个细胞系上，用来触发那一条。
+    ## Two datasets per gene (two different cell lines), so that "the driver has
+    ## >= 2 cell lines" holds on healthy input; with n_cell = 1 both sit on the
+    ## same cell line, which is what triggers that reason.
     g <- sprintf("TF%02d", seq_len(n_prog))
     meta <- data.frame(
         dataset_id = paste0("D", rep(seq_len(n_prog), each = 2), c("a", "b")),
@@ -95,8 +97,9 @@ test_that("the tier is the worst reason, not the first", {
 })
 
 test_that("one under-covered candidate does not block the whole run", {
-    ## 4 个候选里 3 个有 2 个细胞系、1 个只有 1 个：整批仍然可以归属，
-    ## 只是那一个候选自己不该被认领。取 min 会把整批都挡掉。
+    ## Of the 4 candidates, 3 have 2 cell lines and 1 has only 1: the batch is still
+    ## attributable, only that one candidate should not be claimed on its own. Taking
+    ## the min would block the whole batch.
     ref <- .make_preflight_ref()
     ref$meta$cell_line[ref$meta$perturbed_gene == "TF20"] <- "A"
     ego <- .make_ego()
@@ -170,8 +173,9 @@ test_that("unchecked gene counts and candidate coverage cannot approve attributi
 })
 
 test_that("min_cell_lines is not inherited from the global environment", {
-    ## 旧实现用 exists("n_cell_lines_min") 做控制流，全局里恰好有个同名变量
-    ## 就会被写进输出。改成显式 NA 初始化后，没算过就是没有这一列。
+    ## The old implementation used exists("n_cell_lines_min") for control flow, so a
+    ## same-named variable in the global environment leaked into the output. With
+    ## explicit NA initialisation, never computed means the column is simply absent.
     assign("n_cell_lines_min", 999L, envir = globalenv())
     on.exit(rm("n_cell_lines_min", envir = globalenv()), add = TRUE)
     ego <- .make_ego()
