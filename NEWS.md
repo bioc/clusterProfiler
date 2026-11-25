@@ -1,3 +1,7 @@
+# clusterProfiler 4.22.0
+
++ Bioconductor RELEASE_3_24 (2026-11-25, Wed)
+
 # clusterProfiler 4.21.6
 
 ## mechanism evidence: correctness and limits
