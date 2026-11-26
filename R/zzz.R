@@ -4,15 +4,13 @@
     # msg <- paste0(pkgname, " v", pkgVersion, "  ",
     #               "For help: https://yulab-smu.top/biomedical-knowledge-mining-book/", "\n\n")
     
-    # A per-session cache used to default to tempdir(), unconditionally. That
-    # overwrote any directory the user set in .Rprofile, and because tempdir()
-    # differs in every session it also made downloaded resources -- the
-    # mechanism_sets() GMT files -- miss their cache and download again each
-    # time. Only fill the option when nobody has set it.
-    if (is.null(getOption("clusterProfiler_cache_dir"))) {
-        options(clusterProfiler_cache_dir = yulab.utils::user_dir("clusterProfiler"))
-    }
-
+    # The cache directory is deliberately NOT resolved here. user_dir() creates
+    # what it returns, and attaching the package must not write to disk: the
+    # CRAN packages depending on clusterProfiler load it during their own
+    # check, and a directory created at attach time is precisely what the
+    # out-of-tempdir write complaint was about. The option is read lazily by
+    # mechanism_cache_root() and get_ppi_network() when a download first needs
+    # a directory, and a value set in .Rprofile still wins.
     packageStartupMessage(yulab.utils::yulab_msg(pkgname))
 }
 

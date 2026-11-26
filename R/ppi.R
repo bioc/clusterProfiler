@@ -192,12 +192,15 @@ get_ppi_network <- function(taxID = 9606, version = "12.0", score_threshold = 40
     url <- sprintf("https://stringdb-downloads.org/download/protein.links.v%s/%s.protein.links.v%s.txt.gz",
                    version, taxID, version)
     
-    # Generate cache directory using yulab.utils
+    # Resolved on first use, never at attach: user_dir() creates the directory.
     cache_dir <- yulab.utils::user_dir("clusterProfiler")
     destfile <- file.path(cache_dir, basename(url))
     
     # Download if not cached
     if (!file.exists(destfile)) {
+        if (!dir.exists(cache_dir)) {
+            dir.create(cache_dir, recursive = TRUE)
+        }
         message("Downloading full background PPI network from STRING...")
         message("URL: ", url)
         message("Destination: ", destfile)

@@ -79,8 +79,9 @@
 #'   ChIP target sets overlap this list less than chance. Read before setting
 #'   it.
 #' @param cache_dir Directory holding downloaded GMT files. Defaults to
-#'   `getOption("clusterProfiler_cache_dir")`, which [clusterProfiler-package]
-#'   sets once per session.
+#'   `getOption("clusterProfiler_cache_dir")` if set, otherwise
+#'   `yulab.utils::user_dir("clusterProfiler")`, created on first download.
+#'   See [clusterProfiler-package].
 #' @return A `GSON` object whose `gsid2gene` maps set identifiers to HGNC
 #'   symbols, with `species`, `keytype = "SYMBOL"`, `gsname`, `version` and
 #'   `accessed_date` filled in.
@@ -207,9 +208,31 @@ mechanism_gmt_url <- function(file, release) {
 ## the same place `mechanism_sets()` reads from; hard-coding a path worked only
 ## while the test was run from one particular working directory, which is not
 ## how R CMD check runs.
+##
+## This is also the only place the default directory is resolved. Doing it here
+## rather than at attach time keeps `library(clusterProfiler)` free of disk
+## writes, which matters for the CRAN packages that only load it during their
+## own check: the user directory is honoured by yulab.utils::user_dir() via
+## R_USER_DATA_DIR. The directory is created here too, because user_dir() does
+## that, but only once some caller actually wants a cache. That is still after
+## attach; .mechanism_ensure_dir() re-checks it before writing, which covers a
+## caller-supplied cache_dir that never comes through this function.
 mechanism_cache_root <- function(cache_dir = NULL) {
     cache_dir %||% getOption("clusterProfiler_cache_dir") %||%
         yulab.utils::user_dir("clusterProfiler")
+}
+
+## Create the cache directory at the moment a download needs it, and not
+## before. yulab.utils::user_dir() creates what it returns, so calling it from
+## .onAttach() wrote to disk on plain attach; this helper is the place a write
+## is allowed to happen, and it fails loudly rather than letting the download
+## report a missing file later.
+.mechanism_ensure_dir <- function(dir) {
+    if (!dir.exists(dir)) dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+    if (!dir.exists(dir)) {
+        rlang::abort(paste0("Could not create the cache directory: ", dir))
+    }
+    invisible(dir)
 }
 
 mechanism_fetch_gmt <- function(path, release, cache_dir) {
@@ -227,7 +250,7 @@ mechanism_fetch_gmt <- function(path, release, cache_dir) {
     }
 
     url <- mechanism_gmt_url(basename(path), release)
-    dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
+    .mechanism_ensure_dir(cache_dir)
     status <- tryCatch(
         suppressWarnings(utils::download.file(url, path, quiet = TRUE)),
         error = function(e) conditionMessage(e)
@@ -444,7 +467,7 @@ mechanism_tfunion <- function(species = "Homo sapiens",
     if (!.mechanism_enrichr_cached(path)) {
         url <- paste0("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=",
                       utils::URLencode(library, reserved = TRUE))
-        dir.create(cache_dir, showWarnings = FALSE, recursive = TRUE)
+        .mechanism_ensure_dir(cache_dir)
         ## A stale fragment must not be mistaken for a cache hit further down.
         unlink(path)
         status <- tryCatch(
