@@ -26,8 +26,9 @@ collection contents reproducible; a release is never inferred from the
 current date.}
 
 \item{cache_dir}{Directory holding downloaded GMT files. Defaults to
-`getOption("clusterProfiler_cache_dir")`, which [clusterProfiler-package]
-sets once per session.}
+`getOption("clusterProfiler_cache_dir")` if set, otherwise
+`yulab.utils::user_dir("clusterProfiler")`, created on first download.
+See [clusterProfiler-package].}
 
 \item{subset}{Keep only the parts of the collection produced by a named
 evidence rule: `"gtrd"` for the ChIP-defined TF sets (whose identifiers are

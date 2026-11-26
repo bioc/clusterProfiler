@@ -1,3 +1,10 @@
+# clusterProfiler 4.22.1
+
++ Do not create the cache directory when the package is attached (2026-11-26, Thu)
+    - `~/.local/share/clusterProfiler` was created by `.onAttach()`, so that a package which merely loads clusterProfiler during `R CMD check` wrote outside `tempdir()`, which CRAN reports to the 4 CRAN packages depending on clusterProfiler; the directory is now created by the download that needs it (`mechanism_sets()`, `mechanism_tfunion()`, `get_ppi_network()`), and attaching writes nothing
+    - `yulab.utils::user_dir()` now follows `tools::R_user_dir()` (yulab.utils >= 0.2.6.001), which honours `R_USER_DATA_DIR` and so keeps `R CMD check` inside `tempdir()`; the cache moves from `~/.local/share/clusterProfiler` to `~/.local/share/R/clusterProfiler`, and resources cached in the old location are downloaded once more
+    - `options(clusterProfiler_cache_dir = ...)` still wins and is now read lazily, on first use of the cache, rather than at attach
+
 # clusterProfiler 4.21.6
 
 ## mechanism evidence: correctness and limits

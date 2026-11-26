@@ -20,8 +20,9 @@ collection contents reproducible; a release is never inferred from the
 current date.}
 
 \item{cache_dir}{Directory holding downloaded GMT files. Defaults to
-`getOption("clusterProfiler_cache_dir")`, which [clusterProfiler-package]
-sets once per session.}
+`getOption("clusterProfiler_cache_dir")` if set, otherwise
+`yulab.utils::user_dir("clusterProfiler")`, created on first download.
+See [clusterProfiler-package].}
 }
 \value{
 A `GSON`, in the same shape as [mechanism_sets()] returns.
